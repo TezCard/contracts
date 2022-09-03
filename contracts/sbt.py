@@ -5,42 +5,86 @@ In TezCard world every thing maybe a SBT
 import smartpy as sp
 FA2 = sp.io.import_script_from_url("https://smartpy.io/templates/fa2_lib.py")
 
-class SBTMintPolicy(FA2.FA2,
+class Organization(sp.Contract,
+                    FA2.FA2,
                     FA2.MintFungible,
                     FA2.Fa2Nft,
                     FA2.OnchainviewBalanceOf):
-    def __init__(self, metadata):
-        # NFT0 = FA2.make_metadata(
-        #     name     = "SBT MetaData",
-        #     decimals = 0,
-        #     symbol   = "EFA2" )
+    def __init__(self, evaluation_address, metadata):
+        FA2.Fa2Nft.__init__(self, metadata, policy = FA2.NoTransfer())
+        # # manager address list
+        # evaluation contract address
+        # contract metadata
+        self.init(
+            NFT0 = metadata,
+            evaluation_address = evaluation_address,
+            power_mint_address_set = sp.TSet(sp.TAddress), # own sbt address list
+            owner_address_map = sp.big_map({}, tkey = sp.TAddress,
+                                                tvalue = sp.utils.metadata_of_url("http://example.com"))
+        )
 
-        FA2.Fa2Nft.__init__(self, metadata)
-        # This adds two elements in the contract's data.
-        self.data.sbt_rights = sp.big_map({}, tkey = sp.Address, tvalue = sp.TNat)
+#         NFT0 = FA2.make_metadata(
+#             name     = "SBT MetaData",
+#             decimals = 0,
+#             symbol   = "EFA2" )
 
-    def verify_tx_mint_permissions(self, sender):
-        # Called each time a transaction is being looked at.
-        # Called evaluation contract, the sender is permissions to mint sbt
+    @sp.entry_point
+    def on_create_rank(self):
+        # check permissions
+        self.verify(self.sender == self.data.evaluation_address)
+        pass
 
 
     @sp.entry_point
+    def on_join_rank(self):
+        # check permissions
+        self.verify(self.sender == self.data.evaluation_address)
+        pass
+
+    @sp.entry_point
+    def on_check_join(self):
+        # check permissions
+        self.verify(self.sender == self.data.evaluation_address)
+        pass
+
+    @sp.entry_point
+    def on_receive_factor(self, params):
+        sp.set_type(params, sp.TAddress)
+        # check permissions
+        self.verify(self.sender == self.data.evaluation_address)
+        self.data.power_mint_address_set.add(params)
+
+    @sp.entry_point
+    def list_participate(self, params):
+		sp.set_type(params, sp.TRecord(
+			rank_id = sp.TAddress,
+		))
+
+    @sp.entry_point
+	def list_rank(self, params):
+		sp.set_type(params, sp.TRecord(
+			limit = sp.TNat,
+			offset = sp.TNat,
+		))
+
+    @sp.entry_point
     def mint(self, batch):
-        # Anyone can mint
-        self.verify_tx_mint_permissions(self.sender)
+        # check can or cannot mint
+        self.verify(self.data.power_mint_address_set.contains(self.sender))
+        self.verify(! self.data.owner_address_map.keys().contains(self.sender))
 
         example_fa2_nft.mint(
             [
                 sp.record(
                     to_  = self.sender, # Who will receive the original mint
-                    metadata = NFT0
+                    metadata = self.data.NFT0
                 )
             ]
         ).run(sender = self.sender)
 
-        # This adds two elements in the contract's data.
-        self.update_initial_storage(x=self.sender, y=1)
+        # storage already mint
+        self.data.owner_address_map[self.sender] = self.data.NFT0
 
     @sp.entry_point
     def get_balance_of(self):
-        self.sbt_rights.contains(self.sender)
+        self.data.owner_address_map.keys().contains(self.sender)
