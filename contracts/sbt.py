@@ -1,9 +1,33 @@
 """
 TezCard SBT contract 
 In TezCard world every thing maybe a SBT 
+
+TODO: rename to Orgnazition and mixin the logic of rank operation 
+close rank 
 """
 import smartpy as sp
 FA2 = sp.io.import_script_from_url("https://smartpy.io/templates/fa2_lib.py")
+
+t_rank_variables = sp.TVariant(
+    fixed_rank = sp.TRecord(
+        threhold_score=sp.TNat
+    ),
+    time_elapsed = sp.TRecord(
+        threhold_block_level=sp.TNat,
+        threhold_member_count = sp.TNat
+    )
+)
+t_rank_record = sp.TRecord(
+    orgnazition_id=sp.TNat,
+    factors=sp.TList(sp.TNat),
+    weight=sp.TList(sp.TNat),
+    open=sp.TBool,
+    variable=t_rank_variables,
+).layout(("orgnazition_id", ("factors", ("weight", ("open", "variable")))))
+
+# define the role-based authorization control like normal web2 application
+class RBAC:
+    pass
 
 class Organization(sp.Contract,
                     FA2.FA2,

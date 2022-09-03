@@ -1,5 +1,9 @@
 import smartpy as sp
 
+# TODO: what we need is just a template of Factor 
+# to make more abstract for this abstraction
+
+# TODO: remove it 
 class FactorFactory(sp.Contract):
 
 	def __init__(self, administrator):
