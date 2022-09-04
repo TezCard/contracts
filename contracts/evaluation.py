@@ -11,35 +11,34 @@ FA2 = sp.io.import_script_from_url("https://smartpy.io/templates/fa2_lib.py")
 # 3. set_rank_pattern(sbt_address, token_id, type, threhold)
 # 4. open_rank(sbt_address, token_id), close_rank(sbt_address, token_id)
 
-
-t_orgnazition_params = sp.TRecord(
+t_organization_params = sp.TRecord(
     managers=sp.TList(sp.TAddress),
     name=sp.TString,
     logo=sp.TString,
     symbol=sp.TString,
 ).layout(("managers",("name", ("logo", "symbol"))))
 
-t_orgnazition_record = sp.TRecord(
+t_organization_record = sp.TRecord(
     id=sp.TNat,
     address=sp.TAddress,
-    managers=sp.TMap( # FIXME: maybe we should move it into the SBT inner 
-        tkey=sp.TAddress,
-        tvalue=sp.TUnit
-    )
-).layout(("id", ("address", "managers")))
+    name=sp.TString,
+    logo=sp.TString,
+    symbol=sp.TString,
+    managers=sp.TList(sp.TAddress),
+).layout(("id", ("address", ("name", ("logo", ("symbol", "managers"))))))
 
 t_add_factor_params = sp.TRecord(
     owner=sp.TAddress,
-    addresss=sp.TAddress,
-    name=sp.TString
+    name=sp.TString,
+    address=sp.TAddress
 ).layout(("owner", ("name", "address")))
 
 t_factor_record = sp.TRecord(
     owner=sp.TAddress,
+    name=sp.TString,
     address=sp.TAddress,
-    pause=sp.TBool,
-    name=sp.TString
-).layout(("owner", ("address", ("pause", "name"))))
+    pause=sp.TBool
+).layout(("owner", ("name", ("address", "pause"))))
 
 t_pause_factor_params = sp.TRecord(
     factor_id=sp.TNat,
@@ -51,41 +50,40 @@ t_list_factor_params = sp.TRecord(
     limit=sp.TNat
 ).layout(("offset", "limit"))
 
-
 t_rank_variables = sp.TVariant(
     fixed_rank = sp.TRecord(
-        threhold_score=sp.TNat
+        threshold_score=sp.TNat
     ),
     time_elapsed = sp.TRecord(
-        threhold_block_level=sp.TNat,
-        threhold_member_count = sp.TNat
+        threshold_block_level=sp.TNat,
+        threshold_member_count = sp.TNat
     )
 )
 
 t_create_rank_params = sp.TRecord(
-    orgnazition_id=sp.TNat,
+    organization_id=sp.TNat,
     factors=sp.TList(sp.TNat),
-    weight=sp.TList(sp.TNat),
+    weights=sp.TList(sp.TNat),
     variable=t_rank_variables
-).layout("orgnazition_id", ("factors", ("weight", "variable")))
+).layout("organization_id", ("factors", ("weights", "variable")))
 
 t_rank_record = sp.TRecord(
-    orgnazition_id=sp.TNat,
+    organization_id=sp.TNat,
     factors=sp.TList(sp.TNat),
     weight=sp.TList(sp.TNat),
     open=sp.TBool,
     variable=t_rank_variables,
     pause=sp.TBool,
-).layout(("orgnazition_id", ("factors", ("weight", ("open", ("pause","variable"))))))
+).layout(("organization_id", ("factors", ("weight", ("open", ("pause","variable"))))))
 
 t_open_rank_params = sp.TRecord(
     id=sp.TNat
 ).layout(("id"))
 
 t_join_rank_params = sp.TRecord(
-    orgnazition_id=sp.TNat,
+    organization_id=sp.TNat,
     rank_id=sp.TNat
-).layout(("orgnazition_id", "rank_id"))
+).layout(("organization_id", "rank_id"))
 
 t_on_join_rank_callback_params = sp.TRecord(
     user=sp.TAddress,
@@ -103,24 +101,26 @@ class TezCardFactory(sp.Contract):
             admin=sp.TAddress,
         ).layout(("admin")))
         sp.init(
-            admin=sp.TAddress,
-            # orgnazitions
-            next_orgnazition_id=sp.TNat,
-            orgnazitions=sp.big_map(
-                tkey=sp.TAddress,
-                tvalue=t_orgnazition_record
+            admin=params.admin,
+            # organizations
+            next_organization_id=sp.nat(1),
+            organizations=sp.big_map(
+                tkey=sp.TNat,
+                tvalue=t_organization_record
             ),
-            orgnazition_names=sp.big_map(
+            organization_names=sp.big_map(
                 tkey=sp.TString,
                 tvalue=sp.TUnit
             ),
-            my_created_orgnazitions=sp.big_map(
-                tkey=sp.TNat,
-                tvalue=sp.TUnit
-            ),
-            my_joined_orgnazitions=sp.big_map(
-                tkey=sp.TNat,
-                tvalue=sp.TUnit
+
+#             my_created_organizations=sp.big_map(
+#                 tkey=sp.TNat,
+#                 tvalue=sp.TUnit
+#             ),
+
+            my_joined_organizations=sp.big_map(
+                tkey=sp.TAddress,
+                tvalue=sp.TSet(sp.TNat)
             ),
             # factors
             next_factor_id=sp.nat(1),
@@ -137,15 +137,22 @@ class TezCardFactory(sp.Contract):
         )
     
     @sp.entry_point
-    def create_orgnazition(self, params):
+    def create_organization(self, params):
         """
-        create a new orgnazition  
+        create a new organization
         """
-        sp.set_type(params, t_orgnazition_params)
-        sp.verify(not self.data.names.contains(params.name), "Orgnazition is exists")
-        # TODO:george create a new Orgnazition contract
-        # TODO:george add new logic for query my orgnazition 
-    
+        sp.set_type(params, t_organization_params)
+        sp.verify(sp.sender == self.data.admin, "create organization required admin permission")
+        sp.verify(not self.data.organization_names.contains(params.name), "Organization is exists")
+        # TODO:george create a new Organization contract
+        # TODO:george add new logic for query my organization
+        organization_id = self.data.next_organization_id
+        # storage
+        self.data.next_organization_id += 1
+        self.data.organization_names[params.name] = sp.none
+        sp.set_set_result_type(sp.TNat)
+        sp.result(organization_id)
+
     @sp.entry_point
     def on_mint_callback(self, params):
         """
@@ -172,6 +179,7 @@ class TezCardFactory(sp.Contract):
         self.data.factors[factor_id] = factor
         self.data.next_factor_id += 1
 
+    @sp.offchain_view()
     @sp.entry_point
     def pause_factor(self, params):
         """
@@ -179,6 +187,7 @@ class TezCardFactory(sp.Contract):
         """
         sp.set_type(params, t_pause_factor_params)
         sp.verify(sp.sender == self.data.admin, "add factor required admin permission")
+        sp.verify(self.data.factors.contains(params.factor_id), "factor_id not exists")
         self.data.factors[params.factor_id].pause=sp.bool(params.pause)
 
     @sp.offchain_view()
@@ -201,45 +210,59 @@ class TezCardFactory(sp.Contract):
     def create_rank(self, params):
         sp.set_type(params, t_create_rank_params)
         rank_id=self.data.next_rank_id
-        sp.verify(self.data.orgnazitions.contains(params.orgnazition_id), "orgnazition is not exists")
-        orgnazition = self.data.orgnazitions[params.orgnazition_id]
+        sp.verify(self.data.organizations.contains(params.organization_id), "organization is not exists")
+        organization = self.data.organizations[params.organization_id]
         # FIXME: remove the admin check to the SBT inner callback
-        sp.verify(orgnazition.managers.contains(sp.sender), "operator is not manager of this orgnazition")
+        sp.verify(organization.managers.contains(sp.sender), "operator is not manager of this organization")
         rank = sp.record(
-            orgnazition_id=params.orgnazition_id,
+#             organization_id=params.organization_id,
+            rank_id=rank_id
             factors=params.factors,
-            weight=params.weight,
+            weights=params.weights,
             open=sp.bool(False),
             variable=params.variable,
             pause=sp.bool(False)
         )
-        # callback to the orgnazition 
-        on_create_rank = sp.Contract(t_rank_record, orgnazition.address, "on_create_rank").open_some("address is not TezCard DAO")
+        # callback to the organization
+        on_create_rank = sp.Contract(t_rank_record, organization.address, "on_create_rank").open_some("address is not TezCard DAO")
         sp.transfer(rank, sp.tez(0), on_create_rank)
         # FIXME: not save move the record into the SBT inner 
         self.data.next_rank_id += 1
 
     @sp.entry_point
     def open_rank(self, params):
-        # TODO: I think move this entry into the SBT is soundness 
-        sp.set_type(params, t_open_rank_params)        
-        sp.verify(self.data.orgnazitions.contains(params.orgnazition_id), "orgnazition is not exists")
-        orgnazition = self.data.orgnazitions[params.orgnazition_id]
-        # callback to the orgnazition contract SBT
-        on_open_rank = sp.Contract(sp.TUnit, orgnazition.address, "on_open_rank").open_some("address is not the TezCard SBT")
+        # TODO: I think move this entry into the SBT is soundness
+        sp.set_type(params, t_open_rank_params)
+        sp.verify(self.data.organizations.contains(params.organization_id), "organization is not exists")
+        organization = self.data.organizations[params.organization_id]
+        # only managers can open rank
+        sp.verify(organization.managers.contains(sp.sender), "operator is not manager of this organization")
+        # callback to the organization contract SBT
+        on_open_rank = sp.Contract(sp.TUnit, organization.address, "on_open_rank").open_some("address is not the TezCard SBT")
         sp.transfer(sp.unit, sp.tez(0), on_open_rank)
-        
+
     @sp.entry_point
     def join_rank(self, params):
         sp.set_type(params, t_join_rank_params)
-        sp.verify(self.data.orgnazitions.contains(params.orgnazition_id), "orgnazition is not exists")
+        # check organization is valid
+        sp.verify(self.data.organizations.contains(params.organization_id), "organization is not exists")
+        # check rank is valid
+        sp.verify(self.data.ranks.contains(params.rank_id), "rank is not exists")
+        # check organization and rank is match
+        sp.verify(self.data.ranks[params.rank_id].organization_id == params.organization_id, "organization and rank is not match")
+        # check rank in still work
+        sp.verify(self.data.ranks[params.rank_id].open == sp.sp.bool(True), "rank have already closed")
         # TODO:george how to make user to know if the rank is still work ?
-        ## callbackto a single function 
-        # fixed-rank 
-        # time-elapsed 
-        orgnazition = self.data.orgnazitions[params.orgnazition_id]
-        on_join_rank = sp.Contract(t_on_join_rank_callback_params, orgnazition.address, "on_join_rank").open_some("address is not the TezCard SBT")
-        sp.transfer(sp.record(user=sp.source, rank_id=params.rank_id), sp.tez(0), "on_join_rank")
+
+        ## callback to a single function
+        # fixed-rank
+        # time-elapsed
+        organization = self.data.organizations[params.organization_id]
+        on_join_rank = sp.Contract(t_on_join_rank_callback_params, organization.address, "on_join_rank").open_some("address is not the TezCard SBT")
+        sp.transfer(sp.record(user=sp.sender, rank_id=params.rank_id), sp.tez(0), "on_join_rank")
+
+        # storage
+        self.data.my_joined_organizations[sp.sender].add(params.organization_id)
 
 
     # offchain views 
@@ -267,10 +290,13 @@ class TezCardFactory(sp.Contract):
         # global TezCard Rank Dashboard for all users 
         pass
 
-    @sp.offchain_view()
-    def list_my_orgnazition(self, params):
-        pass
 
     @sp.offchain_view()
-    def list_my_joined_orgnazition(self, params):
-        pass
+    def list_my_joined_orgnazition(self, param):
+        sp.set_type(param, sp.TAddress)
+        organization_ids = self.data.my_joined_organizations[param]
+        res = sp.TList(t_organization_record)
+        sp.for x in organization_ids:
+            res.push(self.dao.organizations[x])
+        sp.set_result_type(sp.TList(t_organization_record))
+        sp.result(res)
