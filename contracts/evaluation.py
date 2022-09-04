@@ -113,10 +113,10 @@ class TezCardFactory(sp.Contract):
                 tvalue=sp.TUnit
             ),
 
-#             my_created_organizations=sp.big_map(
-#                 tkey=sp.TNat,
-#                 tvalue=sp.TUnit
-#             ),
+            my_created_organizations=sp.big_map(
+                tkey=sp.TNat,
+                tvalue=sp.TSet(sp.TNat)
+            ),
 
             my_joined_organizations=sp.big_map(
                 tkey=sp.TAddress,
@@ -152,6 +152,7 @@ class TezCardFactory(sp.Contract):
         self.data.organization_names[params.name] = sp.none
         sp.set_set_result_type(sp.TNat)
         sp.result(organization_id)
+
 
     @sp.entry_point
     def on_mint_callback(self, params):
@@ -290,6 +291,14 @@ class TezCardFactory(sp.Contract):
         # global TezCard Rank Dashboard for all users 
         pass
 
+    @sp.offchain_view()
+    def query_organization(self, param):
+        sp.set_type(param, sp.TString)
+        sp.set_result_type(sp.TBool)
+        sp.if self.data.organization_names.contains(param):
+            sp.result(sp.bool(True)
+        sp.else:
+            sp.result(sp.bool(False))
 
     @sp.offchain_view()
     def list_my_joined_orgnazition(self, param):

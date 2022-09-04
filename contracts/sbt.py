@@ -24,7 +24,7 @@ t_rank_record = sp.TRecord(
     open = sp.TBool,
     variable = t_rank_variables,
     pause=sp.TBool
-).layout(("organization_id", ("factors", ("weights", ("open", ("variable", "pause"))))))
+).layout(("rank_id", ("factors", ("weights", ("open", ("variable", "pause"))))))
 
 t_rank_joins_record = sp.TRecord(
     rank_id = sp.TNat,
@@ -204,7 +204,7 @@ class Organization(sp.Contract,
         ).run(sender = sp.sender)
 
         # TODO calculate top
-        
+
 
         # storage already mint
         self.data.owner_address_map[sp.sender] = self.data.NFT0
