@@ -1,9 +1,9 @@
 """
-TezCard SBT contract 
-In TezCard world every thing maybe a SBT 
+TezCard SBT contract
+In TezCard world every thing maybe a SBT
 
 TODO: rename to Organization and mixin the logic of rank operation
-close rank 
+close rank
 """
 import smartpy as sp
 
@@ -48,14 +48,7 @@ t_list_rank_params = sp.TRecord(
 ).layout(("rank_id", ("offset", "limit")))
 
 
-# define the role-based authorization control like normal web2 application
-class RBAC:
-    pass
-
-
-class Organization(sp.Contract,
-                   FA2.FA2,
-                   FA2.MintFungible,
+class Organization(FA2.MintFungible,
                    FA2.Fa2Nft,
                    FA2.OnchainviewBalanceOf):
     def __init__(self, evaluation_address, managers, metadata):
@@ -135,11 +128,11 @@ class Organization(sp.Contract,
             sp.verify(self.data.t_rank_joins_map.contains(params.rank_id), "rank not exist")
 
             list_users = sp.TList(sp.TAddress)
-            with sp.if t_list_rank_params.type == 1:
+            with sp.if_(t_list_rank_params.type == 1):
                 list_users = self.data.t_rank_joins_map[rank_id].join_users
-            with sp.elif t_list_rank_params.type == 2:
+            with sp.elif_(t_list_rank_params.type == 2):
                 list_users = self.data.t_rank_joins_map[rank_id].win_users
-            with sp.else:
+            with sp.else_():
                 list_users = self.data.t_rank_joins_map[rank_id].minted_users
             len = sp.len(list_users)
             sp.verify(params.offset < len, "offset is overflow")
@@ -157,15 +150,15 @@ class Organization(sp.Contract,
         sp.set_type(params, t_list_params)
         # TODO check params.type is invalid
         participants = sp.TList(sp.TAddress)
-        with sp.if t_list_rank_params.type == 1:
+        with sp.if_(t_list_rank_params.type == 1):
             participants = sp.TSet(sp.TAddress)
             for x in self.data.t_rank_joins_map.keys():
                 participants.add(self.data.t_rank_joins_map[x].join_users)
-        with sp.elif t_list_rank_params.type == 2:
+        with sp.elif_(t_list_rank_params.type == 2):
             participants = sp.TSet(sp.TAddress)
-            with sp.for x in self.data.t_rank_joins_map.keys():
+            with sp.for_(x in self.data.t_rank_joins_map.keys()):
                 participants.add(self.data.t_rank_joins_map[x].win_users)
-        with sp.else:
+        with sp.else_():
             participants = sp.TSet(sp.TAddress)
             for x in self.data.t_rank_joins_map.keys():
                 participants.add(self.data.t_rank_joins_map[x].minted_users)
@@ -188,8 +181,8 @@ class Organization(sp.Contract,
         sp.verify(self.data.t_rank_joins_map.contains(param), "rank not exist")
         # check can or cannot mint
         tag = sp.bool(False)
-        with sp.for x in self.data.t_rank_joins_map.keys():
-            with sp.if self.data.t_rank_joins_map[x].win_users.contains(sp.sender):
+        with sp.for_(x in self.data.t_rank_joins_map.keys()):
+            with sp.if_(self.data.t_rank_joins_map[x].win_users.contains(sp.sender)):
                 tag = sp.bool(True)
         sp.verify(tag, "you have no permissions to mint")
         sp.verify(not self.data.owner_address_map.keys().contains(sp.sender), "already mint, cannot mint again")
@@ -212,7 +205,7 @@ class Organization(sp.Contract,
     @sp.entry_point
     def get_balance_of(self):
         sp.set_result_type(sp.TNat)
-        with sp.if self.data.owner_address_map.keys().contains(sp.sender):
+        with sp.if_(self.data.owner_address_map.keys().contains(sp.sender)):
             sp.result(1)
-        with sp.else:
+        with sp.else_():
             sp.result(0)
