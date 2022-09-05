@@ -88,14 +88,14 @@ class Organization(sp.Contract,
         @sp.entry_point
         def on_create_organization(self, params):
             # check permissions
-            self.verify(sp.sender == self.data.evaluation_address)
+            sp.verify(sp.sender == self.data.evaluation_address)
             self.set_type(params, sp.TList(sp.TAddress))
             self.data.managers = params
 
         @sp.entry_point
         def on_create_rank(self, params):
             # check permissions
-            self.verify(sp.sender == self.data.evaluation_address)
+            sp.verify(sp.sender == self.data.evaluation_address)
             sp.set_type(params, t_rank_record)
             sp.verify(self.data.t_rank_record_map.contains(params.rank_id), "rank not exists")
             # storage
@@ -106,9 +106,9 @@ class Organization(sp.Contract,
             sp.set_type(user, sp.TAddress)
             sp.set_type(rank_id, sp.TNat)
             # only evaluation can call
-            self.verify(sp.sender == self.data.evaluation_address, "only evaluation can call")
+            sp.verify(sp.sender == self.data.evaluation_address, "only evaluation can call")
             # check rank_id exists
-            self.verify(self.t_rank_address.contains(rank_id), "rank is not exists")
+            sp.verify(self.t_rank_address.contains(rank_id), "rank is not exists")
             # TODO whether or not check rank is open or close
             # storage
             self.data.t_rank_joins_map[rank_id].join_users.add(user)
@@ -118,14 +118,14 @@ class Organization(sp.Contract,
         @sp.entry_point
         def on_check_join(self):
             # check permissions
-            self.verify(sp.sender == self.data.evaluation_address)
+            sp.verify(sp.sender == self.data.evaluation_address)
             pass
 
         @sp.entry_point
         def on_receive_factor(self, params):
             sp.set_type(params, sp.TAddress)
             # check permissions
-            self.verify(sp.sender == self.data.evaluation_address)
+            sp.verify(sp.sender == self.data.evaluation_address)
 
         @sp.offchain_view()
         @sp.entry_point
@@ -185,14 +185,14 @@ class Organization(sp.Contract,
     def mint(self, param):
         sp.set_type(param, sp.TNat)
         # check rank_id exist
-        self.verify(self.data.t_rank_joins_map.contains(param), "rank not exist")
+        sp.verify(self.data.t_rank_joins_map.contains(param), "rank not exist")
         # check can or cannot mint
         tag = sp.bool(False)
         with sp.for x in self.data.t_rank_joins_map.keys():
             with sp.if self.data.t_rank_joins_map[x].win_users.contains(sp.sender):
                 tag = sp.bool(True)
-        self.verify(tag, "you have no permissions to mint")
-        self.verify(not self.data.owner_address_map.keys().contains(sp.sender), "already mint, cannot mint again")
+        sp.verify(tag, "you have no permissions to mint")
+        sp.verify(not self.data.owner_address_map.keys().contains(sp.sender), "already mint, cannot mint again")
 
         example_fa2_nft.mint(
             [
