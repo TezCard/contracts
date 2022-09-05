@@ -3,6 +3,7 @@ from re import A
 from signal import pause
 from contracts.sbt import Organization
 import smartpy as sp
+
 SBT = sp.io.import_script_from_url("file://sbt.py")
 FA2 = sp.io.import_script_from_url("https://smartpy.io/templates/fa2_lib.py")
 
@@ -16,7 +17,7 @@ t_organization_params = sp.TRecord(
     name=sp.TString,
     logo=sp.TString,
     symbol=sp.TString,
-).layout(("managers",("name", ("logo", "symbol"))))
+).layout(("managers", ("name", ("logo", "symbol"))))
 
 t_organization_record = sp.TRecord(
     id=sp.TNat,
@@ -51,12 +52,12 @@ t_list_factor_params = sp.TRecord(
 ).layout(("offset", "limit"))
 
 t_rank_variables = sp.TVariant(
-    fixed_rank = sp.TRecord(
+    fixed_rank=sp.TRecord(
         threshold_score=sp.TNat
     ),
-    time_elapsed = sp.TRecord(
+    time_elapsed=sp.TRecord(
         threshold_block_level=sp.TNat,
-        threshold_member_count = sp.TNat
+        threshold_member_count=sp.TNat
     )
 )
 
@@ -74,7 +75,7 @@ t_rank_record = sp.TRecord(
     open=sp.TBool,
     variable=t_rank_variables,
     pause=sp.TBool,
-).layout(("organization_id", ("factors", ("weight", ("open", ("pause","variable"))))))
+).layout(("organization_id", ("factors", ("weight", ("open", ("pause", "variable"))))))
 
 t_open_rank_params = sp.TRecord(
     id=sp.TNat
@@ -90,10 +91,11 @@ t_on_join_rank_callback_params = sp.TRecord(
     rank_id=sp.TNat
 ).layout("user", "rank_id")
 
-t_is_member_params=sp.TRecord(
+t_is_member_params = sp.TRecord(
     user=sp.TAddress,
 
 )
+
 
 class TezCardFactory(sp.Contract):
     def __init__(self, params):
@@ -135,7 +137,7 @@ class TezCardFactory(sp.Contract):
                 tvalue=t_rank_record
             )
         )
-    
+
     @sp.entry_point
     def create_organization(self, params):
         """
@@ -152,7 +154,6 @@ class TezCardFactory(sp.Contract):
         self.data.organization_names[params.name] = sp.none
         sp.set_set_result_type(sp.TNat)
         sp.result(organization_id)
-
 
     @sp.entry_point
     def on_mint_callback(self, params):
@@ -189,7 +190,7 @@ class TezCardFactory(sp.Contract):
         sp.set_type(params, t_pause_factor_params)
         sp.verify(sp.sender == self.data.admin, "add factor required admin permission")
         sp.verify(self.data.factors.contains(params.factor_id), "factor_id not exists")
-        self.data.factors[params.factor_id].pause=sp.bool(params.pause)
+        self.data.factors[params.factor_id].pause = sp.bool(params.pause)
 
     @sp.offchain_view()
     def list_factor(self, params):
@@ -210,14 +211,14 @@ class TezCardFactory(sp.Contract):
     @sp.entry_point
     def create_rank(self, params):
         sp.set_type(params, t_create_rank_params)
-        rank_id=self.data.next_rank_id
+        rank_id = self.data.next_rank_id
         sp.verify(self.data.organizations.contains(params.organization_id), "organization is not exists")
         organization = self.data.organizations[params.organization_id]
         # FIXME: remove the admin check to the SBT inner callback
         sp.verify(organization.managers.contains(sp.sender), "operator is not manager of this organization")
         rank = sp.record(
-#             organization_id=params.organization_id,
-            rank_id=rank_id
+            #             organization_id=params.organization_id,
+            rank_id=rank_id,
             factors=params.factors,
             weights=params.weights,
             open=sp.bool(False),
@@ -225,7 +226,8 @@ class TezCardFactory(sp.Contract):
             pause=sp.bool(False)
         )
         # callback to the organization
-        on_create_rank = sp.Contract(t_rank_record, organization.address, "on_create_rank").open_some("address is not TezCard DAO")
+        on_create_rank = sp.Contract(t_rank_record, organization.address, "on_create_rank").open_some(
+            "address is not TezCard DAO")
         sp.transfer(rank, sp.tez(0), on_create_rank)
         # FIXME: not save move the record into the SBT inner 
         self.data.next_rank_id += 1
@@ -239,7 +241,8 @@ class TezCardFactory(sp.Contract):
         # only managers can open rank
         sp.verify(organization.managers.contains(sp.sender), "operator is not manager of this organization")
         # callback to the organization contract SBT
-        on_open_rank = sp.Contract(sp.TUnit, organization.address, "on_open_rank").open_some("address is not the TezCard SBT")
+        on_open_rank = sp.Contract(sp.TUnit, organization.address, "on_open_rank").open_some(
+            "address is not the TezCard SBT")
         sp.transfer(sp.unit, sp.tez(0), on_open_rank)
 
     @sp.entry_point
@@ -250,7 +253,8 @@ class TezCardFactory(sp.Contract):
         # check rank is valid
         sp.verify(self.data.ranks.contains(params.rank_id), "rank is not exists")
         # check organization and rank is match
-        sp.verify(self.data.ranks[params.rank_id].organization_id == params.organization_id, "organization and rank is not match")
+        sp.verify(self.data.ranks[params.rank_id].organization_id == params.organization_id,
+                  "organization and rank is not match")
         # check rank in still work
         sp.verify(self.data.ranks[params.rank_id].open == sp.sp.bool(True), "rank have already closed")
         # TODO:george how to make user to know if the rank is still work ?
@@ -259,28 +263,26 @@ class TezCardFactory(sp.Contract):
         # fixed-rank
         # time-elapsed
         organization = self.data.organizations[params.organization_id]
-        on_join_rank = sp.Contract(t_on_join_rank_callback_params, organization.address, "on_join_rank").open_some("address is not the TezCard SBT")
+        on_join_rank = sp.Contract(t_on_join_rank_callback_params, organization.address, "on_join_rank").open_some(
+            "address is not the TezCard SBT")
         sp.transfer(sp.record(user=sp.sender, rank_id=params.rank_id), sp.tez(0), "on_join_rank")
 
         # storage
         self.data.my_joined_organizations[sp.sender].add(params.organization_id)
 
-
-    # offchain views 
+    # offchain views
     @sp.offchain_view()
     @sp.onchain_view()
     def if_memebr(self, params):
         # on-chain view let the voting contract to know if a member is a memebr 
         pass
 
-    
     @sp.offchain_view()
     @sp.onchain_view()
     def is_admin(self, params):
         # on-chain view let the voting contract to create a new voting for this dao
         pass
 
-    
     @sp.offchain_view()
     @sp.onchain_view()
     def get_rank(self, params):
@@ -295,17 +297,18 @@ class TezCardFactory(sp.Contract):
     def query_organization(self, param):
         sp.set_type(param, sp.TString)
         sp.set_result_type(sp.TBool)
-        sp.if self.data.organization_names.contains(param):
-            sp.result(sp.bool(True)
-        sp.else:
+        if self.data.organization_names.contains(param):
+            sp.result(sp.bool(True))
+        else:
             sp.result(sp.bool(False))
 
-    @sp.offchain_view()
-    def list_my_joined_orgnazition(self, param):
-        sp.set_type(param, sp.TAddress)
-        organization_ids = self.data.my_joined_organizations[param]
-        res = sp.TList(t_organization_record)
-        sp.for x in organization_ids:
-            res.push(self.dao.organizations[x])
-        sp.set_result_type(sp.TList(t_organization_record))
-        sp.result(res)
+
+@sp.offchain_view()
+def list_my_joined_orgnazition(self, param):
+    sp.set_type(param, sp.TAddress)
+    organization_ids = self.data.my_joined_organizations[param]
+    res = sp.TList(t_organization_record)
+    for x in organization_ids:
+        res.push(self.dao.organizations[x])
+    sp.set_result_type(sp.TList(t_organization_record))
+    sp.result(res)
