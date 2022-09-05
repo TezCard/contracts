@@ -135,11 +135,11 @@ class Organization(sp.Contract,
             sp.verify(self.data.t_rank_joins_map.contains(params.rank_id), "rank not exist")
 
             list_users = sp.TList(sp.TAddress)
-            if t_list_rank_params.type == 1:
+            with sp.if t_list_rank_params.type == 1:
                 list_users = self.data.t_rank_joins_map[rank_id].join_users
-            elif t_list_rank_params.type == 2:
+            with sp.elif t_list_rank_params.type == 2:
                 list_users = self.data.t_rank_joins_map[rank_id].win_users
-            else:
+            with sp.else:
                 list_users = self.data.t_rank_joins_map[rank_id].minted_users
             len = sp.len(list_users)
             sp.verify(params.offset < len, "offset is overflow")
@@ -157,16 +157,15 @@ class Organization(sp.Contract,
         sp.set_type(params, t_list_params)
         # TODO check params.type is invalid
         participants = sp.TList(sp.TAddress)
-        if t_list_rank_params.type == 1:
+        with sp.if t_list_rank_params.type == 1:
             participants = sp.TSet(sp.TAddress)
             for x in self.data.t_rank_joins_map.keys():
                 participants.add(self.data.t_rank_joins_map[x].join_users)
-        elif t_list_rank_params.type == 2:
+        with sp.elif t_list_rank_params.type == 2:
             participants = sp.TSet(sp.TAddress)
-            for x in self.data.t_rank_joins_map.keys():
+            with sp.for x in self.data.t_rank_joins_map.keys():
                 participants.add(self.data.t_rank_joins_map[x].win_users)
-
-        else:
+        with sp.else:
             participants = sp.TSet(sp.TAddress)
             for x in self.data.t_rank_joins_map.keys():
                 participants.add(self.data.t_rank_joins_map[x].minted_users)
@@ -189,8 +188,8 @@ class Organization(sp.Contract,
         self.verify(self.data.t_rank_joins_map.contains(param), "rank not exist")
         # check can or cannot mint
         tag = sp.bool(False)
-        for x in self.data.t_rank_joins_map.keys():
-            if self.data.t_rank_joins_map[x].win_users.contains(sp.sender):
+        with sp.for x in self.data.t_rank_joins_map.keys():
+            with sp.if self.data.t_rank_joins_map[x].win_users.contains(sp.sender):
                 tag = sp.bool(True)
         self.verify(tag, "you have no permissions to mint")
         self.verify(not self.data.owner_address_map.keys().contains(sp.sender), "already mint, cannot mint again")
@@ -213,7 +212,7 @@ class Organization(sp.Contract,
     @sp.entry_point
     def get_balance_of(self):
         sp.set_result_type(sp.TNat)
-        if self.data.owner_address_map.keys().contains(sp.sender):
+        with sp.if self.data.owner_address_map.keys().contains(sp.sender):
             sp.result(1)
-        else:
+        with sp.else:
             sp.result(0)

@@ -297,9 +297,9 @@ class TezCardFactory(sp.Contract):
     def query_organization(self, param):
         sp.set_type(param, sp.TString)
         sp.set_result_type(sp.TBool)
-        if self.data.organization_names.contains(param):
+        with sp.if self.data.organization_names.contains(param):
             sp.result(sp.bool(True))
-        else:
+        with sp.else:
             sp.result(sp.bool(False))
 
 
@@ -308,7 +308,7 @@ def list_my_joined_orgnazition(self, param):
     sp.set_type(param, sp.TAddress)
     organization_ids = self.data.my_joined_organizations[param]
     res = sp.TList(t_organization_record)
-    for x in organization_ids:
+    with sp.for x in organization_ids:
         res.push(self.dao.organizations[x])
     sp.set_result_type(sp.TList(t_organization_record))
     sp.result(res)
