@@ -1,7 +1,13 @@
-# TezCard Contracts
+# What is TezCard?
 
-## What is SBT and How to specify it ?
+We have joined enough DAO but there have no DAO toolset to help the DAOs which has no developer but also has the requirement for manage tool. For example some blockchain fans could join in their own DAO wanna to find out the Gold in Web3 but if they have no toolset. Then they just funding and make decition off-chain suffering some attack risk.
 
-Before this concept bring forward, any NFT stored on-chain just naively using the value storage without any bound. But in the real world we belive anything has its own soul. For example, one NFT has its trading value, because of the inner artistic value consensused among the all community. 
+So we have implement a flavor DAO toolset on Tezos named TezCard.
 
-As this view, Vatilik issued, we belive that any DAO has its soul like a human. Since, in TezCard we using a SBT to represent a specific DAO 
+In this toolset, we have specific two specification into `Memebershio` and `Voting`. Based on the `Memebrship` any developer could develop some tools for DAO managers such as `On-Chain Profile` `On-Chain VC`. Using the Tezos lambda the developer also could build a new voting tool over the DID in TezCard to execute any action.
+
+Memebership we have splited in to two concept to join
+
+1. Fixed-Rank 
+2. Time-Elapsed 
+
