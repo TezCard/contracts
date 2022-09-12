@@ -1,0 +1,28 @@
+Factory 合约 ：
+1. create_orgnazitation（entry point） create合约
+2. add_factor (entry_point) 添加因子
+3. pause_factor(entry_point) 暂停因子
+4. list_factors(entry_point) 查询因子
+5. list_orgnazations(offchain_view) 查询合约
+6. on_rank_created(entry_point, callback) 回调
+7. on_rank_open(entry_point, callback)
+8. on_rank_closed(entry_point, callback) 回调
+9. on_member_join_rank(entry_point, callback) 回调
+10. on_member_leave_rank(entry_point, callback) 回调
+11. on_member_mint(entry_point, callback)
+12. on_receive_score(entry_point, callback) 因子分数过来
+
+Orgnazation合约
+1.create_rank(entry_point)
+2.open_rank(entry_point)
+3. close_rank(entry_point)
+4. join_rank(entry_point)
+5. leave_rank(entry_point)
+6. mint(entry_point)
+7. on_receive_score(entry_point call from factory) 因子分数过来
+8. is_rank_open(offchain_view)
+9. list_rank(offchain_view)
+10. current_score(offchain_view)
+11. current_members(offchain_view)
+12. is_bottled(offchain_view wether user minted)
+13. list_factors(offchain_view, list a specific rank details)

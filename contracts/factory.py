@@ -166,10 +166,17 @@ class OrganizitionFactory(sp.Contract):
         sp.set_result_type(sp.TList(t_factor_record))
         sp.result(result)
 
-    # TODO: complete the callback functions 
+    @sp.offchain_view()
+    def list_organization(self, params):
+        pass
+
+
+    # TODO: complete the callback functions
+
 
     @sp.entry_point
     def on_rank_created(self, params):
+
         pass
 
     @sp.entry_point
@@ -181,11 +188,22 @@ class OrganizitionFactory(sp.Contract):
         pass
 
     @sp.entry_point
-    def on_rank_joined(self, params):
+    def on_member_join_rank(self, params):
         """
         someone join the rank
         """
         pass
 
+    @sp.entry_point
+    def on_member_leave_rank(self, params):
+        pass
+
+    @sp.entry_point
+    def on_member_mint(self, params):
+        pass
+
+    @sp.entry_point
+    def on_receive_score(self, params):
+        pass
 
 sp.add_compilation_target("TezCard-Main",OrganizitionFactory(sp.record(admin=sp.address("tz1TZBoXYVy26eaBFbTXvbQXVtZc9SdNgedB"))))

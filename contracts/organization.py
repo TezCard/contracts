@@ -74,7 +74,6 @@ t_rank_record = sp.TRecord(
     )
 ))
 
-
 t_rank_join_params = sp.TRecord(
     rank_id=sp.TNat
 ).layout(("rank_id"))
@@ -126,6 +125,7 @@ t_list_my_join_rank_params = sp.TRecord(
     offset=sp.TNat
 ).layout(("limit", "offset"))
 
+
 class Organization(FA2.Fa2Nft,
                    FA2.OffchainviewTokenMetadata,
                    FA2.OnchainviewBalanceOf):
@@ -142,10 +142,10 @@ class Organization(FA2.Fa2Nft,
             next_rank_id=sp.nat(0),
             # ranks list
             ranks=sp.big_map({}, tkey=sp.TNat, tvalue=t_rank_record),
-            # rank records 
+            # rank records
             join_records=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TBigMap(sp.TAddress, t_rank_join_record)),
             # managers of this Organization
-            managers=params.managers, 
+            managers=params.managers,
             # OrganizationFactory contract address used to callback
             factory=params.factory,
             # the bottle used to contain the Organization member soul
@@ -161,11 +161,11 @@ class Organization(FA2.Fa2Nft,
             # whitelist
             white_list=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TUnit)
         )
-    
+
     @sp.entry_point
     def create_rank(self, params):
         """
-        create a new rank in this organization  
+        create a new rank in this organization
         """
         sp.set_type(params, t_create_rank_params)
         sp.verify(self.data.managers.contains(sp.sender), "create rank must have the manager permission")
@@ -187,9 +187,9 @@ class Organization(FA2.Fa2Nft,
         )
         self.data.ranks[rank_id] = record
         self.data.join_records[rank_id] = sp.big_map({}, tkey=sp.TAddress, tvalue=t_rank_join_record)
-        self.data.waiting_ranks[rank_id]=sp.unit
+        self.data.waiting_ranks[rank_id] = sp.unit
         self.data.next_rank_id += 1
-        # TODO: callback to the Factory to indexing 
+        # TODO: callback to the Factory to indexing
 
     @sp.entry_point
     def open_rank(self, params):
@@ -203,55 +203,54 @@ class Organization(FA2.Fa2Nft,
         sp.verify(rank.open, "rank must be open")
         sp.verify(rank.waiting, "rank must be waiting now")
         rank.open = sp.bool(True)
-        rank.waiting=sp.bool(False)
+        rank.waiting = sp.bool(False)
 
         # try remove from the waiting list
         with sp.if_(self.data.waiting_ranks.contains(params.rank_id)):
             del self.data.waiting_ranks[params.rank_id]
- 
-        self.data.opened_ranks[params.rank_id]=sp.unit
+
+        self.data.opened_ranks[params.rank_id] = sp.unit
         # TODO: callback to the Factory the Rank is Open
-    
 
     @sp.entry_point
     def close_rank(self, params):
         """
-        close a rank 
+        close a rank
         move from open list to close list
         """
         sp.set_type(params, t_rank_close_params)
         sp.verify(self.data.managers.contains(sp.source), "open rank must have admin permission")
         self._close_rank(params.rank_id)
-        #TODO: callback to the Factory the Rank is Close
+        # TODO: callback to the Factory the Rank is Close
 
     def _close_rank(self, rank_id):
         """
-        close action for the rank 
+        close action for the rank
         """
         sp.set_type(rank_id, sp.TNat)
         rank = self.data.ranks[rank_id]
         sp.verify(rank.open, "rank must be open now")
-        rank.open = sp.bool(False) 
+        rank.open = sp.bool(False)
         # modify the indexing storage
         with sp.if_(self.data.opened_ranks.contains(rank_id)):
             del self.data.opened_ranks[rank_id]
-        self.data.closed_ranks[rank_id]=sp.unit
+        self.data.closed_ranks[rank_id] = sp.unit
         #
 
     @sp.entry_point
     def join_rank(self, params):
         """
-        some user want to join this rank everyone only have one soulbound token in this Org 
+        some user want to join this rank everyone only have one soulbound token in this Org
         """
         sp.set_type(params, t_rank_join_params)
         sp.verify(self.data.bottle.contains(sp.source), "user have already joined this organization")
         sp.verify(self.data.ranks.contains(params.rank_id), "rank not found")
         address = sp.source
-        rank = self.self.data.ranks[params.rank_id]
+        rank = self.data.ranks[params.rank_id]
         sp.verify(rank.open, "rank must be still open")
         record_id = rank.next_record_id + 1
         sp.verify(self.data.join_records.contains(record_id), "rank records not found")
-        join_record=self.data.join_records[record_id]
+        join_record = self.data.join_records[record_id]
         record = sp.record(
             participant=address,
             rank_id=params.rank_id,
@@ -263,28 +262,31 @@ class Organization(FA2.Fa2Nft,
         with sp.else_():
             self.data.my_joined_rank[address] = sp.list([params.rank_id])
         # TODO: callback to the Factory to indexing
- 
+
+    @sp.entry_point
+    def leave_rank(self, params):
+        pass
+
     @sp.entry_point
     def mint(self):
-        # last_token_id from the NFT 
-        # adapt from FA2 
+        # last_token_id from the NFT
+        # adapt from FA2
         with sp.if_(self.data.white_list.contains(sp.source)):
             token_id = sp.compute(self.data.last_token_id)
             metadata = sp.record(token_id=token_id, token_info=sp.map(l={}, tkey=sp.TString, tvalue=sp.TBytes))
             self.data.token_metadata[token_id] = metadata
-            self.data.ledger[token_id] = self.source
-            self.data.last_token_id += 1 
+            self.data.ledger[token_id] = sp.source
+            self.data.last_token_id += 1
             del self.data.white_list[sp.source]
-            # TODO: callback to the Factory to indexing 
+            # TODO: callback to the Factory to indexing
         with sp.else_():
             sp.failwith("user not in the white list")
 
-
     @sp.entry_point
-    def receive_score(self, params):
+    def on_receive_score(self, params):
         sp.set_type(params, t_receive_score_callback_params)
         sp.verify(sp.sender == self.data.factory, "only let the factory contract to call")
-        #TODO: handle the dispatcher 
+        # TODO: handle the dispatcher
         pass
 
     def calculate_score_fixed_rank(self, params, member_limit):
@@ -317,7 +319,7 @@ class Organization(FA2.Fa2Nft,
                     scores.candidates[params.participant] = total
                     # issue the white list
                     self.white_list[params.participand] = sp.unit
-                    # update max min
+                    # updat max min
                     with sp.if_(total < scores.min_score):
                         scores.min_score = total
                     with sp.if_(total > scores.max_score):
@@ -333,7 +335,7 @@ class Organization(FA2.Fa2Nft,
                 scores.candidates[params.participant] = total
                 # issue the white list
                 self.white_list[params.participand] = sp.unit
-                # update max min
+                # updat max min
                 with sp.if_(total < scores.min_score):
                     scores.min_score = total
                 with sp.if_(total > scores.max_score):
@@ -352,9 +354,8 @@ class Organization(FA2.Fa2Nft,
         join_records = self.data.join_records[params.rank_id]
         variable = rank.variable.open_variant("time_elapsed")
 
-        
         with sp.if_(current_block < variable.threshold_block_level):
-            # TODO: should check on-chain sort to care about the safety 
+            # TODO: should check on-chain sort to care about the safety
             pass
         with sp.else_():
             self._close_rank(params.rank_id)
@@ -362,32 +363,45 @@ class Organization(FA2.Fa2Nft,
     # TODO: add manager CURD methods
 
     @sp.onchain_view()
-    def is_rank_open(self):
+    def is_rank_open(self, rank_id):
         """
         used for the factor contract to read to decide if should report score
         """
         sp.set_type(rank_id, sp.TNat)
         rank = self.data.ranks[rank_id]
         sp.verify(rank.open, "rank must be open now")
-        sp.result(sp.bool(rank.open))
+        sp.result(rank.open)
 
     @sp.offchain_view()
-    def list_ranks(self, params):
+    def list_rank(self, params):
         sp.set_type(params, t_list_rank_params)
         # TODO: use the page logic to hanlde this
 
     @sp.offchain_view()
+    def current_score(self, params):
+        pass
+
+    @sp.offchain_view()
+    def current_members(self, params):
+        pass
+
+    @sp.offchain_view()
     def get_rank_details(self, rank_id):
         sp.set_type(rank_id, sp.TNat)
+        # TODO: return the inner rank record type
         rank = self.data.ranks[rank_id]
         sp.result(rank)
 
     @sp.offchain_view()
-    def is_in_bottle(self):
+    def is_bottled(self):
         """
         return if the user is in the bottle has minted the Token
         """
         sp.result(sp.bool(False))
+
+    @sp.offchain_view()
+    def list_factors(self):
+        pass
 
 @sp.add_test(name="Minimal")
 def test():
@@ -397,7 +411,12 @@ def test():
         "description": "A description about the contract",
         "version": 1,
     }
-    c1 = Organization(factory="1213", managers={"123": "vd", "2323": "vd"}, metadata={"123": metadata})
+
+    def newKitty(factory, managers, metadata):
+        return sp.record(factory=factory, managers=managers, metadata=metadata)
+
+    c1 = Organization(newKitty("12", sp.map(l={"12": "123", "23": "0"}), sp.map(
+        l={"12": sp.utils.bytes_of_string("adfa"), "23": sp.utils.bytes_of_string("sdfasd")})))
     scenario += c1
     """ Test views """
     # Display the offchain call result
