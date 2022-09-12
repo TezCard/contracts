@@ -16,12 +16,12 @@ FA2 = sp.io.import_script_from_url("https://smartpy.io/templates/fa2_lib.py")
 t_rank_variables = sp.TVariant(
     fixed_rank=sp.TRecord(
         threshold_score_limit=sp.TNat,
-        threhold_member_limit=sp.TOption(sp.TNat)
-    ).layout(("threshold_score_limit", "threhold_memeber_limit")),
+        threshold_member_limit=sp.TOption(sp.TNat)
+    ).layout(("threshold_score_limit", "threshold_member_limit")),
     time_elapsed=sp.TRecord(
-        threhold_block_level=sp.TNat,
-        threhold_member_limit=sp.TNat
-    ).layout(("threhold_block_level", "threhold_memeber_limit"))
+        threshold_block_level=sp.TNat,
+        threshold_member_limit=sp.TNat
+    ).layout(("threshold_block_level", "threshold_member_limit"))
 )
 
 t_create_rank_params = sp.TRecord(
@@ -36,7 +36,7 @@ t_rank_score_record = sp.TRecord(
     candidates=sp.TMap(sp.TAddress, sp.TNat),
     max_score=sp.TNat,
     min_score=sp.TNat
-).layout(("candiates", ("max_score", "min_score")))
+).layout(("candidates", ("max_score", "min_score")))
 
 t_rank_record = sp.TRecord(
     rank_id=sp.TNat,
@@ -148,7 +148,7 @@ class Organization(FA2.Fa2Nft,
             managers=params.managers, 
             # OrganizationFactory contract address used to callback
             factory=params.factory,
-            # the bottle used to contain the Organization memeber soul
+            # the bottle used to contain the Organization member soul
             bottle=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TNat),
             # my joined rank
             my_joined_rank=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TList(sp.TNat)),
@@ -168,11 +168,11 @@ class Organization(FA2.Fa2Nft,
         create a new rank in this organization  
         """
         sp.set_type(params, t_create_rank_params)
-        sp.verify(self.data.managers.contains(sp.sender), "creat rank must have the manager permission")
+        sp.verify(self.data.managers.contains(sp.sender), "create rank must have the manager permission")
         rank_id = self.data.next_rank_id + 1
         record = sp.record(
             rank_id=rank_id,
-            next_rcord_id=sp.nat(0),
+            next_record_id=sp.nat(0),
             name=params.name,
             decr=params.decr,
             factors=params.factors,
@@ -287,9 +287,9 @@ class Organization(FA2.Fa2Nft,
         #TODO: handle the dispatcher 
         pass
 
-    def calculate_score_fixed_rank(self, params, memeber_limit):
+    def calculate_score_fixed_rank(self, params, member_limit):
         sp.set_type(params, t_receive_score_callback_params)
-        sp.set_type(memeber_limit, sp.TOption(sp.TNat))
+        sp.set_type(member_limit, sp.TOption(sp.TNat))
 
         sp.verify(self.data.ranks.contains(params.rank_id), "rank must exists in this organization")
         rank = self.data.ranks[params.rank_id]
@@ -306,9 +306,9 @@ class Organization(FA2.Fa2Nft,
         # update the rank
         total = join_records[params.participant].score
         scores = rank.scores
-        # if memeber limit is some then update the list and try close
-        with sp.if_(memeber_limit.is_some()):
-            limit = memeber_limit.open_some()
+        # if member limit is some then update the list and try close
+        with sp.if_(member_limit.is_some()):
+            limit = member_limit.open_some()
             with sp.if_(sp.len(scores.candidates) < limit):
                 variable = rank.variable
                 parameter = variable.open_variant("fixed_rank")
@@ -317,7 +317,7 @@ class Organization(FA2.Fa2Nft,
                     scores.candidates[params.participant] = total
                     # issue the white list
                     self.white_list[params.participand] = sp.unit
-                    # updat max min 
+                    # update max min
                     with sp.if_(total < scores.min_score):
                         scores.min_score = total
                     with sp.if_(total > scores.max_score):
@@ -333,16 +333,16 @@ class Organization(FA2.Fa2Nft,
                 scores.candidates[params.participant] = total
                 # issue the white list
                 self.white_list[params.participand] = sp.unit
-                # updat max min 
+                # update max min
                 with sp.if_(total < scores.min_score):
                     scores.min_score = total
                 with sp.if_(total > scores.max_score):
                     scores.max_score = total
         rank.scores = scores
 
-    def calculate_score_time_elapsed(self, params, memeber_limit):
+    def calculate_score_time_elapsed(self, params, member_limit):
         sp.set_type(params, t_receive_score_callback_params)
-        sp.set_type(memeber_limit, sp.TNat)
+        sp.set_type(member_limit, sp.TNat)
 
         sp.verify(self.data.ranks.contains(params.rank_id), "rank must exists in this organization")
         current_block = sp.level
@@ -353,7 +353,7 @@ class Organization(FA2.Fa2Nft,
         variable = rank.variable.open_variant("time_elapsed")
 
         
-        with sp.if_(current_block < variable.threhold_block_level):
+        with sp.if_(current_block < variable.threshold_block_level):
             # TODO: should check on-chain sort to care about the safety 
             pass
         with sp.else_():
@@ -366,7 +366,10 @@ class Organization(FA2.Fa2Nft,
         """
         used for the factor contract to read to decide if should report score
         """
-        sp.result(sp.bool(False))
+        sp.set_type(rank_id, sp.TNat)
+        rank = self.data.ranks[rank_id]
+        sp.verify(rank.open, "rank must be open now")
+        sp.result(sp.bool(rank.open))
 
     @sp.offchain_view()
     def list_ranks(self, params):
@@ -376,7 +379,8 @@ class Organization(FA2.Fa2Nft,
     @sp.offchain_view()
     def get_rank_details(self, rank_id):
         sp.set_type(rank_id, sp.TNat)
-        # TODO: return the inner rank record type 
+        rank = self.data.ranks[rank_id]
+        sp.result(rank)
 
     @sp.offchain_view()
     def is_in_bottle(self):
@@ -384,3 +388,17 @@ class Organization(FA2.Fa2Nft,
         return if the user is in the bottle has minted the Token
         """
         sp.result(sp.bool(False))
+
+@sp.add_test(name="Minimal")
+def test():
+    scenario = sp.test_scenario()
+    metadata = {
+        "name": "Contract Name",
+        "description": "A description about the contract",
+        "version": 1,
+    }
+    c1 = Organization(factory="1213", managers={"123": "vd", "2323": "vd"}, metadata={"123": metadata})
+    scenario += c1
+    """ Test views """
+    # Display the offchain call result
+    scenario.show(c1.is_in_bottle(1))
