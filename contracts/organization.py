@@ -1,9 +1,5 @@
 """
-TezCard SBT contract
-In TezCard world every thing maybe a SBT
-
-TODO: rename to Organization and mixin the logic of rank operation
-close rank
+TezCard Soul Bounded Token
 """
 import smartpy as sp
 
@@ -13,411 +9,481 @@ FA2 = sp.io.import_script_from_url("https://smartpy.io/templates/fa2_lib.py")
 # Types #
 #########
 
-t_rank_variables = sp.TVariant(
-    fixed_rank=sp.TRecord(
+t_madel_parameter = sp.TVariant(
+    fixed_score=sp.TRecord(
         threshold_score_limit=sp.TNat,
         threshold_member_limit=sp.TOption(sp.TNat)
-    ).layout(("threshold_score_limit", "threshold_member_limit")),
+    ),
     time_elapsed=sp.TRecord(
         threshold_block_level=sp.TNat,
         threshold_member_limit=sp.TNat
-    ).layout(("threshold_block_level", "threshold_member_limit"))
-)
-
-t_create_rank_params = sp.TRecord(
-    organization_id=sp.TNat,
-    name=sp.TBytes,
-    decr=sp.TBytes,
-    factors=sp.TMap(sp.TNat, sp.TNat),
-    variable=t_rank_variables
-).layout(("organization_id", ("name", ("decr", ("factors", "variable")))))
-
-t_rank_score_record = sp.TRecord(
-    candidates=sp.TMap(sp.TAddress, sp.TNat),
-    max_score=sp.TNat,
-    min_score=sp.TNat
-).layout(("candidates", ("max_score", "min_score")))
-
-t_rank_record = sp.TRecord(
-    rank_id=sp.TNat,
-    next_record_id=sp.TNat,
-    name=sp.TBytes,
-    decr=sp.TBytes,
-    factors=sp.TMap(sp.TNat, sp.TNat),
-    open=sp.TBool,
-    variable=t_rank_variables,
-    waiting=sp.TBool,
-    scores=t_rank_score_record
-).layout((
-    "rank_id",
-    (
-        "next_record_id",
-        (
-            "name",
-            (
-                "decr",
-                (
-                    "factors",
-                    (
-                        "open",
-                        (
-                            "variable",
-                            (
-                                "waiting",
-                                "scores"
-                            )
-                        )
-                    )
-                )
-            )
-        )
     )
-))
+)
 
-t_rank_join_params = sp.TRecord(
-    rank_id=sp.TNat
-).layout(("rank_id"))
+t_madel_record = sp.TRecord(
+    name=sp.TBytes,
+    description=sp.TBytes,
+    factors=sp.TMap(sp.TAddress, sp.TNat),
+    open=sp.TBool,
+    end=sp.TBool,
+    parameter=t_madel_parameter,
+    candidates=sp.TMap(sp.TAddress, sp.TNat),
+    winners=sp.TList(sp.TAddress),
+    max_score=sp.TNat,
+    min_score=sp.TNat, 
+)
 
-t_rank_join_record = sp.TRecord(
-    participant=sp.TAddress,
-    rank_id=sp.TNat,
+
+t_my_madel_record = sp.TRecord(
+    block_level=sp.TNat,
     score=sp.TNat,
+    soul_id=sp.TNat,
 )
 
-t_rank_open_params = sp.TRecord(
-    rank_id=sp.TNat,
-).layout(("rank_id"))
+t_organization_result = sp.TRecord(
+    name=sp.TBytes,
+    description=sp.TBytes,
+    logo=sp.TBytes
+).layout(("name", ("description", "logo")))
 
-t_rank_close_params = sp.TRecord(
-    rank_id=sp.TNat,
-).layout(("rank_id"))
-
-t_init_organization_param = sp.TRecord(
-    factory=sp.TAddress,
-    managers=sp.TMap(sp.TAddress, sp.TUnit),
-    metadata=sp.TMap(sp.TString, sp.TBytes)
+t_soul_profile_params=sp.TRecord(
+    name=sp.TBytes,
+    introduce=sp.TBytes,
+    logo=sp.TBytes
 )
 
-t_receive_score_callback_params = sp.TRecord(
-    participant=sp.TAddress,
+t_create_madel_rank_params = sp.TRecord(
+    name=sp.TBytes,
+    description=sp.TBytes,
+    factors=sp.TMap(sp.TAddress, sp.TNat),
+    parameter=t_madel_parameter,
+)
+
+t_open_madel_rank_params = sp.TRecord(
+    rank_id=sp.TNat
+)
+
+t_my_madel_details = sp.TRecord(
+    madel_id=sp.TNat,
+    name=sp.TBytes,
+    description=sp.TBytes,
+    block_level=sp.TNat
+)
+
+
+t_factor_receive_score_param = sp.TRecord(
     rank_id=sp.TNat,
-    factor_id=sp.TNat,
+    address=sp.TAddress,
     score=sp.TNat
-).layout(("participant", ("rank_id", ("factor_id", "score"))))
-
-t_list_rank_params = sp.TVariant(
-    waiting=sp.TRecord(
-        limit=sp.TNat,
-        offset=sp.TNat
-    ).layout(("limit", "offset")),
-    opening=sp.TRecord(
-        limit=sp.TNat,
-        offset=sp.TNat
-    ).layout(("limit", "offset")),
-    closed=sp.TRecord(
-        limit=sp.TNat,
-        offset=sp.TNat
-    ).layout(("limit", "offset"))
 )
 
-t_list_my_join_rank_params = sp.TRecord(
-    limit=sp.TNat,
-    offset=sp.TNat
-).layout(("limit", "offset"))
+t_join_madel_rank_param = sp.TRecord(
+    rank_id=sp.TNat
+)
 
+# t_list_madel_ranks_params = sp.TVariant(
+#     opened=sp.TRecord(
+
+#     ),
+#     ended=sp.TRecord(
+
+#     ),
+#     started=sp.TRecord(
+
+#     ),
+#     all=sp.TRecord(
+
+#     )
+# )
 
 class Organization(FA2.Fa2Nft,
                    FA2.OffchainviewTokenMetadata,
+                   FA2.Admin,
                    FA2.OnchainviewBalanceOf):
-    """
-    TezCard Organization abstraction, in the TezCard the Organization is the core
-    concept live in every tool in the toolbox.
-    """
 
-    def __init__(self, params):
-        sp.set_type(params, t_init_organization_param)
-        FA2.Fa2Nft.__init__(self, params.metadata, policy=FA2.NoTransfer())
+    def __init__(self, factory_address, administrator, name, description, logo):
+        FA2.Fa2Nft.__init__(self, metadata=sp.big_map(l=None, tkey=sp.TString, tvalue=sp.TBytes))
         self.update_initial_storage(
-            # id distribution
-            next_rank_id=sp.nat(0),
-            # ranks list
-            ranks=sp.big_map({}, tkey=sp.TNat, tvalue=t_rank_record),
-            # rank records
-            join_records=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TBigMap(sp.TAddress, t_rank_join_record)),
-            # managers of this Organization
-            managers=params.managers,
-            # OrganizationFactory contract address used to callback
-            factory=params.factory,
-            # the bottle used to contain the Organization member soul
-            bottle=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TNat),
-            # my joined rank
-            my_joined_rank=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TList(sp.TNat)),
-            # open rank
-            opened_ranks=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
-            # close rank
-            closed_ranks=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
-            # waiting for open
-            waiting_ranks=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
-            # whitelist
-            white_list=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TUnit)
+            factory_address=factory_address,
+            name=name,
+            description=description,
+            logo=logo,
+            members=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TNat),
+            next_madel_id=sp.nat(1),
+            madels=sp.big_map({}, tkey=sp.TNat, tvalue=t_madel_record),
+            opened_madel_ranks=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
+            ended_madel_ranks=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
+            started_madel_ranks=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
+            my_participated_ranks=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TMap(sp.TNat, sp.TUnit)),
+            my_madels=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TMap(sp.TNat, sp.TNat)),
         )
+        FA2.Admin.__init__(self, administrator)
+
+    def if_soul_bottle_minted(self, address):
+        return self.data.members.contains(address) 
 
     @sp.entry_point
-    def create_rank(self, params):
+    def create_soul_bottle(self, params):
         """
-        create a new rank in this organization
+        create the soul bottle of a wallet
         """
-        sp.set_type(params, t_create_rank_params)
-        sp.verify(self.data.managers.contains(sp.sender), "create rank must have the manager permission")
-        rank_id = self.data.next_rank_id + 1
-        record = sp.record(
-            rank_id=rank_id,
-            next_record_id=sp.nat(0),
-            name=params.name,
-            decr=params.decr,
-            factors=params.factors,
-            open=sp.bool(True),
-            variable=params.variable,
-            waiting=sp.bool(True),
-            scores=sp.record(
-                candidates=sp.map({}, tkey=sp.TAddress, tvalue=sp.TNat),
-                max_score=sp.nat(0),
-                min_score=sp.nat(0)
+        sp.set_type(params, t_soul_profile_params)
+        sp.verify(~self.if_soul_bottle_minted(sp.source), "you have minted a soul bottle")
+        token_id = sp.compute(self.data.last_token_id)
+        metadata = sp.record(
+            token_id = token_id,
+            token_info = sp.map(l={
+                "soul_name": params.name,
+                "soul_introduce": params.introduce,
+                "soul_logo": params.logo,
+            }, tkey=sp.TString, tvalue=sp.TBytes)
+        )
+        self.data.token_metadata[token_id] = metadata
+        self.data.ledger[token_id] = sp.source
+        self.data.members[sp.source] = token_id
+        self.data.last_token_id += 1
+    
+    @sp.entry_point
+    def create_madel_rank(self, params):
+        """
+        create a new madel rank
+        """
+        sp.set_type(params, t_create_madel_rank_params)
+        sp.verify(self.is_administrator(sp.source), "only administrator can create a new rank")
+        rank_id = sp.compute(self.data.next_madel_id)
+
+        # register on factor contract
+        with sp.for_("factor", params.factors.keys()) as factor:
+            sp.verify(params.factors[factor] > sp.nat(0), "factor weight must larger than zero")
+            contract = sp.contract(
+                sp.TRecord(
+                    organization_address=sp.TAddress,
+                    rank_id = sp.TNat,
+                ),
+                factor,
+                "register"
+            ).open_some("not a invalid factor contract")
+            sp.transfer(
+                sp.record(
+                    organization_address=sp.self_address,
+                    rank_id=rank_id,
+                ),
+                sp.tez(0),
+                contract
             )
-        )
-        self.data.ranks[rank_id] = record
-        self.data.join_records[rank_id] = sp.big_map({}, tkey=sp.TAddress, tvalue=t_rank_join_record)
-        self.data.waiting_ranks[rank_id] = sp.unit
-        self.data.next_rank_id += 1
-        # TODO: callback to the Factory to indexing
-
-    @sp.entry_point
-    def open_rank(self, params):
-        """
-        open a rank
-        move from waiting list to the open list
-        """
-        sp.set_type(params, t_rank_open_params)
-        sp.verify(self.data.managers.contains(sp.source), "open rank must have admin permission")
-        rank = self.data.ranks[params.rank_id]
-        sp.verify(rank.open, "rank must be open")
-        sp.verify(rank.waiting, "rank must be waiting now")
-        rank.open = sp.bool(True)
-        rank.waiting = sp.bool(False)
-
-        # try remove from the waiting list
-        with sp.if_(self.data.waiting_ranks.contains(params.rank_id)):
-            del self.data.waiting_ranks[params.rank_id]
-
-        self.data.opened_ranks[params.rank_id] = sp.unit
-        # TODO: callback to the Factory the Rank is Open
-
-    @sp.entry_point
-    def close_rank(self, params):
-        """
-        close a rank
-        move from open list to close list
-        """
-        sp.set_type(params, t_rank_close_params)
-        sp.verify(self.data.managers.contains(sp.source), "open rank must have admin permission")
-        self._close_rank(params.rank_id)
-        # TODO: callback to the Factory the Rank is Close
-
-    def _close_rank(self, rank_id):
-        """
-        close action for the rank
-        """
-        sp.set_type(rank_id, sp.TNat)
-        rank = self.data.ranks[rank_id]
-        sp.verify(rank.open, "rank must be open now")
-        rank.open = sp.bool(False)
-        # modify the indexing storage
-        with sp.if_(self.data.opened_ranks.contains(rank_id)):
-            del self.data.opened_ranks[rank_id]
-        self.data.closed_ranks[rank_id] = sp.unit
-        #
-
-    @sp.entry_point
-    def join_rank(self, params):
-        """
-        some user want to join this rank everyone only have one soulbound token in this Org
-        """
-        sp.set_type(params, t_rank_join_params)
-        sp.verify(self.data.bottle.contains(sp.source), "user have already joined this organization")
-        sp.verify(self.data.ranks.contains(params.rank_id), "rank not found")
-        address = sp.source
-        rank = self.data.ranks[params.rank_id]
-        sp.verify(rank.open, "rank must be still open")
-        record_id = rank.next_record_id + 1
-        sp.verify(self.data.join_records.contains(record_id), "rank records not found")
-        join_record = self.data.join_records[record_id]
+        
+        # save in the organization records 
         record = sp.record(
-            participant=address,
-            rank_id=params.rank_id,
-            score=sp.nat(0)
+            name=params.name,
+            description=params.description,
+            factors=params.factors,
+            open=sp.bool(False),
+            end=sp.bool(False),
+            parameter=params.parameter,
+            candidates=sp.map(l={}, tkey=sp.TAddress, tvalue=sp.TNat),
+            winners=sp.list(l=[], t=sp.TAddress),
+            max_score=sp.nat(0),
+            min_score=sp.nat(0), 
         )
-        join_record[address] = record
-        with sp.if_(self.data.my_joined_rank.contains(address)):
-            self.data.my_joined_rank[address].push(params.rank_id)
-        with sp.else_():
-            self.data.my_joined_rank[address] = sp.list([params.rank_id])
-        # TODO: callback to the Factory to indexing
+        self.data.madels[rank_id] = record
+
+        # save in opened madel ranks
+        self.data.opened_madel_ranks[rank_id] = sp.unit
+
+        # update the last rank id
+        self.data.next_madel_id += 1
+
+    # @sp.offchain_view()
+    # def list_madel_ranks(self, params):
+    #     pass
 
     @sp.entry_point
-    def leave_rank(self, params):
-        pass
+    def start_madel_rank(self, params):
+        """
+        start a new madel rank
+        """
+        sp.set_type(params, t_open_madel_rank_params)
+        sp.verify(self.is_administrator(sp.source), "only administrator can open a rank")
+        sp.verify(self.data.opened_madel_ranks.contains(params.rank_id), "madel rank must be opened")
+        # move to the started list
+        self.data.started_madel_ranks[params.rank_id] = sp.unit
+        self.data.madels[params.rank_id].open=sp.bool(True)
+        del self.data.opened_madel_ranks[params.rank_id]
+
+    # @sp.entry_point
+    # def close_madel_ranks(self, params):
+    #     pass
 
     @sp.entry_point
-    def mint(self):
-        # last_token_id from the NFT
-        # adapt from FA2
-        with sp.if_(self.data.white_list.contains(sp.source)):
-            token_id = sp.compute(self.data.last_token_id)
-            metadata = sp.record(token_id=token_id, token_info=sp.map(l={}, tkey=sp.TString, tvalue=sp.TBytes))
-            self.data.token_metadata[token_id] = metadata
-            self.data.ledger[token_id] = sp.source
-            self.data.last_token_id += 1
-            del self.data.white_list[sp.source]
-            # TODO: callback to the Factory to indexing
-        with sp.else_():
-            sp.failwith("user not in the white list")
+    def join_madel_rank(self, params):
+        """
+        let someone join the rank
+        """
+        sp.set_type(params, t_join_madel_rank_param)
+        sp.verify(self.data.madels.contains(params.rank_id), "there no madel rank")
+        sp.verify(~self.data.madels[params.rank_id].end, "madel rank is ended")
+        sp.verify(self.data.madels[params.rank_id].open, "madel rank is not open now")
+        self.data.madels[params.rank_id].candidates[sp.source] = sp.nat(0)
+
+    # @sp.entry_point
+    # def leave_madel_rank(self, params):
+    #     pass
+
+    # def is_madel_rank_time_elapsed(self, id):
+    #     pass
 
     @sp.entry_point
-    def on_receive_score(self, params):
-        sp.set_type(params, t_receive_score_callback_params)
-        sp.verify(sp.sender == self.data.factory, "only let the factory contract to call")
-        # TODO: handle the dispatcher
-        pass
+    def receive_madel_rank_score(self, params):
+        sp.set_type(params, t_factor_receive_score_param)
+        sp.verify(self.data.madels.contains(params.rank_id), "there no madel rank")
+        sp.verify(~self.data.madels[params.rank_id].end, "madel rank is ended")
+        sp.verify(self.data.madels[params.rank_id].open, "madel rank is not open now")
+        rank = self.data.madels[params.rank_id]
+        with sp.if_(rank.parameter.is_variant("fixed_score")):
+            parameter = rank.parameter.open_variant("fixed_score")
+            self.calculate_fixed_score_rank(
+                params.rank_id,
+                sp.sender,
+                params.address,
+                params.score,
+                parameter.threshold_score_limit,
+                parameter.threshold_member_limit
+            )
 
-    def calculate_score_fixed_rank(self, params, member_limit):
-        sp.set_type(params, t_receive_score_callback_params)
-        sp.set_type(member_limit, sp.TOption(sp.TNat))
+    def calculate_fixed_score_rank(
+        self, 
+        rank_id,
+        factor_address, 
+        wallet_address, 
+        score, 
+        score_limit, 
+        memeber_limit):
 
-        sp.verify(self.data.ranks.contains(params.rank_id), "rank must exists in this organization")
-        rank = self.data.ranks[params.rank_id]
-        join_records = self.data.join_records[params.rank_id]
-        sp.verify(not rank.waiting and rank.open, "rank must open and still work now")
-
-        factors = rank.factors
-        sp.verify(factors.contains(params.factor_id), "factor is not exists in this rank")
-
-        weight = factors[params.factor_id]
-        score = weight * params.score
-        join_records[params.participant].score = score
-
-        # update the rank
-        total = join_records[params.participant].score
-        scores = rank.scores
-        # if member limit is some then update the list and try close
-        with sp.if_(member_limit.is_some()):
-            limit = member_limit.open_some()
-            with sp.if_(sp.len(scores.candidates) < limit):
-                variable = rank.variable
-                parameter = variable.open_variant("fixed_rank")
-                limit = parameter.threshold_score_limit
-                with sp.if_(total >= limit):
-                    scores.candidates[params.participant] = total
-                    # issue the white list
-                    self.white_list[params.participand] = sp.unit
-                    # updat max min
-                    with sp.if_(total < scores.min_score):
-                        scores.min_score = total
-                    with sp.if_(total > scores.max_score):
-                        scores.max_score = total
-                    with sp.if_(sp.len(scores.candidates) == limit):
-                        self._close_rank(params.rank_id)
+        rank = self.data.madels[rank_id]
+        candidate_score = rank.candidates[wallet_address]
+        factor_weight = rank.factors[factor_address]
+        winners = rank.winners
+        now_score = sp.compute(
+            score * factor_weight + candidate_score
+        )
+        # my_madels
+        with sp.if_(memeber_limit.is_some()):
+            limit = memeber_limit.open_some()
+            with sp.if_(sp.len(winners) <= limit):
+                with sp.if_(now_score > rank.max_score):
+                    rank.max_score = now_score
+                with sp.if_(now_score < rank.min_score):
+                    rank.min_score = now_score
+                with sp.if_(now_score >= score_limit):
+                    winners.push(wallet_address)
+            with sp.else_():
+                rank.end = sp.bool(True)
+            rank.winners=winners
+            self.data.madels[rank_id] = rank
         with sp.else_():
-            # just put in to the scores
-            variable = rank.variable
-            parameter = variable.open_variant("fixed_rank")
-            limit = parameter.threshold_score_limit
-            with sp.if_(total >= limit):
-                scores.candidates[params.participant] = total
-                # issue the white list
-                self.white_list[params.participand] = sp.unit
-                # updat max min
-                with sp.if_(total < scores.min_score):
-                    scores.min_score = total
-                with sp.if_(total > scores.max_score):
-                    scores.max_score = total
-        rank.scores = scores
+            with sp.if_(now_score >= score_limit):
+                winners.push(wallet_address)
+            rank.winners=winners
+            self.data.madels[rank_id] = rank
 
-    def calculate_score_time_elapsed(self, params, member_limit):
-        sp.set_type(params, t_receive_score_callback_params)
-        sp.set_type(member_limit, sp.TNat)
+    @sp.offchain_view()
+    def madel_rank_details(self, rank_id):
+        sp.set_type(rank_id, sp.TNat)
+        sp.verify(self.data.madels.contains(rank_id), "madel rank is not exists")
+        sp.result(self.data.madels[rank_id])
 
-        sp.verify(self.data.ranks.contains(params.rank_id), "rank must exists in this organization")
-        current_block = sp.level
-        rank = self.data.ranks[params.rank_id]
-        sp.verify(not rank.waiting and rank.open, "rank must open and still work now")
+    @sp.offchain_view()
+    def list_my_participated_ranks(self):
+        result = sp.compute(sp.list(l=[], t=sp.TNat))
+        with sp.for_("item", self.data.my_participated_ranks[sp.source].keys()) as item:
+            result.push(item)
+        sp.result(result)
 
-        join_records = self.data.join_records[params.rank_id]
-        variable = rank.variable.open_variant("time_elapsed")
+    @sp.offchain_view()
+    def list_my_madels(self):
+        result = sp.compute(sp.list(l=[], t=t_my_madel_details))
+        my_madels = self.data.my_madels[sp.source]
+        with sp.for_("item", my_madels.items()) as item:
+            block_level = item.value
+            madel = self.data.madels[item.key]
+            result.push(
+                sp.record(
+                    madel_id=item.key,
+                    name=madel.name,
+                    description=madel.description,
+                    block_level=block_level
+                )
+            )
+        sp.result(result)
 
-        with sp.if_(current_block < variable.threshold_block_level):
-            # TODO: should check on-chain sort to care about the safety
-            pass
+    @sp.offchain_view()
+    def is_madel_rank_open(self, rank_id):
+        sp.set_type(rank_id, sp.TNat)
+        with sp.if_(self.data.madels.contains(rank_id)):
+            sp.result(
+                ~self.data.madels[rank_id].end
+            )
         with sp.else_():
-            self._close_rank(params.rank_id)
-
-    # TODO: add manager CURD methods
+            sp.result(sp.bool(False))
 
     @sp.onchain_view()
-    def is_rank_open(self, rank_id):
-        """
-        used for the factor contract to read to decide if should report score
-        """
+    def is_madel_rank_open(self, rank_id):
         sp.set_type(rank_id, sp.TNat)
-        rank = self.data.ranks[rank_id]
-        sp.verify(rank.open, "rank must be open now")
-        sp.result(rank.open)
+        with sp.if_(self.data.madels.contains(rank_id)):
+            sp.result(
+                ~self.data.madels[rank_id].end
+            )
+        with sp.else_():
+            sp.result(sp.bool(False))
 
     @sp.offchain_view()
-    def list_rank(self, params):
-        sp.set_type(params, t_list_rank_params)
-        # TODO: use the page logic to hanlde this
+    def organization_details(self):
+        sp.result(
+            sp.record(
+                name=self.data.name,
+                description=self.data.description,
+                logo=self.data.logo
+            )
+        )
 
-    @sp.offchain_view()
-    def current_score(self, params):
-        pass
+    
 
-    @sp.offchain_view()
-    def current_members(self, params):
-        pass
+class TestOrganizationFactory(sp.Contract):
+    def __init__(self, administrator):
+        self.init(
+            administrator=administrator
+        )
 
-    @sp.offchain_view()
-    def get_rank_details(self, rank_id):
-        sp.set_type(rank_id, sp.TNat)
-        # TODO: return the inner rank record type
-        rank = self.data.ranks[rank_id]
-        sp.result(rank)
+class TestFactorContract(sp.Contract):
+    def __init__(self):
+        self.init(
+            ranks=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TMap(sp.TNat, sp.TUnit))
+        )
+    
+    @sp.entry_point
+    def register(self, params):
+        sp.set_type(
+            params,
+            sp.TRecord(
+                organization_address=sp.TAddress,
+                rank_id = sp.TNat,
+            )
+        )
+        with sp.if_(self.data.ranks.contains(params.organization_address)):
+            self.data.ranks[params.organization_address][params.rank_id] = sp.unit
+        with sp.else_():
+            self.data.ranks[params.organization_address] = sp.map(
+                l={
+                    params.rank_id: sp.unit
+                },
+                tkey=sp.TNat,
+                tvalue=sp.TUnit
+            )
+    
+    @sp.entry_point
+    def unregister(self, params):
+       sp.set_type(
+           params,
+           sp.TRecord(
+               organization=sp.TAddress,
+               rank_id=sp.TNat
+           )
+       )
+       sp.verify(self.data.ranks.contains(params.organization))
+       sp.verify(self.data.ranks[params.organization].contains(params.rank_id))
+       del self.data.ranks[params.organization][params.rank_id]
 
-    @sp.offchain_view()
-    def is_bottled(self):
-        """
-        return if the user is in the bottle has minted the Token
-        """
-        sp.result(sp.bool(False))
+    @sp.entry_point
+    def on_candidate_join(self, params):
+        sp.set_type(
+            params,
+            sp.TRecord(
+                organization=sp.TAddress,
+                rank_id=sp.TNat,
+                candidate=sp.TAddress
+            )
+        )
 
-    @sp.offchain_view()
-    def list_factors(self):
-        pass
+    @sp.entry_point
+    def on_candidate_leave(self, params):
+        sp.set_type(
+            params,
+            sp.TRecord(
+                organization=sp.TAddress,
+                rank_id=sp.TNat,
+                candidate=sp.TAddress
+            )
+        )
 
-@sp.add_test(name="Minimal")
-def test():
-    scenario = sp.test_scenario()
-    metadata = {
-        "name": "Contract Name",
-        "description": "A description about the contract",
-        "version": 1,
-    }
+@sp.add_test(name="MintSoulBottleTest")
+def mint_soul_bottle_test():
+    sc = sp.test_scenario()
+    alice = sp.test_account("Alice")
+    bob = sp.test_account("Bob")
+    factory = TestOrganizationFactory(administrator=alice.address)
+    sc += factory
+    organization = Organization(
+        factory_address=factory.address,
+        administrator=alice.address,
+        name=sp.bytes("0x01"),
+        description=sp.bytes("0x02"),
+        logo=sp.bytes("0x03")
+    )
+    sc += organization
+    sc.verify(organization.data.last_token_id == sp.nat(0))
+    # success
+    organization.create_soul_bottle(
+        sp.record(
+            name=sp.bytes("0x01"),
+            introduce=sp.bytes("0x02"),
+            logo=sp.bytes("0x03")
+        )
+    ).run(source=bob.address)
+    sc.verify(organization.data.last_token_id == sp.nat(1))
 
-    def newKitty(factory, managers, metadata):
-        return sp.record(factory=factory, managers=managers, metadata=metadata)
+@sp.add_test(name="CreateMadelRankTest")
+def create_madel_rank_test():
+    pass
+    sc = sp.test_scenario()
+    alice = sp.test_account("Alice")
+    bob = sp.test_account("Bob")
+    factory = TestOrganizationFactory(administrator=alice.address)
+    factor = TestFactorContract()
+    factor2 = TestFactorContract()
+    sc += factory
+    sc += factor
+    sc += factor2
+    organization = Organization(
+        factory_address=factory.address,
+        administrator=alice.address,
+        name=sp.bytes("0x01"),
+        description=sp.bytes("0x02"),
+        logo=sp.bytes("0x03")
+    )
+    sc += organization
+    sc.verify(organization.data.last_token_id == sp.nat(0))
+    # create
+    organization.create_madel_rank(
+        sp.record(
+            name=sp.bytes("0x01"),
+            description=sp.bytes("0x02"),
+            factors=sp.map(
+                l={
+                    factor.address: sp.nat(10),
+                    factor2.address: sp.nat(20),
+                },
+                tkey=sp.TAddress,
+                tvalue=sp.TNat
+            ),
+            parameter=sp.variant("fixed_score", sp.record(
+                threshold_score_limit=sp.nat(20),
+                threshold_member_limit=sp.none
+            ))
+        )
+    ).run(source=alice.address)
 
-    c1 = Organization(newKitty("12", sp.map(l={"12": "123", "23": "0"}), sp.map(
-        l={"12": sp.utils.bytes_of_string("adfa"), "23": sp.utils.bytes_of_string("sdfasd")})))
-    scenario += c1
-    """ Test views """
-    # Display the offchain call result
-    scenario.show(c1.is_in_bottle(1))
+    sc.verify(organization.data.next_madel_id == sp.nat(2))
+    sc.verify(organization.data.opened_madel_ranks.contains(sp.nat(1)))
+    sc.verify(factor.data.ranks.contains(organization.address))
+    sc.verify(factor2.data.ranks.contains(organization.address))
+    sc.verify(factor.data.ranks[organization.address].contains(sp.nat(1)))
