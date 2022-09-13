@@ -41,6 +41,12 @@ t_list_factor_params = sp.TRecord(
     limit=sp.TNat
 ).layout(("offset", "limit"))
 
+
+t_list_organizations_params = sp.TRecord(
+    offset=sp.TNat,
+    limit=sp.TNat
+).layout(("offset", "limit"))
+
 t_rank_variables = sp.TVariant(
     fixed_rank=sp.TRecord(
         threshold_score=sp.TNat
@@ -51,7 +57,7 @@ t_rank_variables = sp.TVariant(
     )
 )
 
-class OrganizitionFactory(sp.Contract):
+class OrganizationFactory(sp.Contract):
     def __init__(self, params):
         sp.set_type(params, sp.TRecord(
             admin=sp.TAddress,
@@ -102,7 +108,7 @@ class OrganizitionFactory(sp.Contract):
                 {
                     sp.string("organization_name"): params.name,
                     sp.string("organization_logo"): params.logo,
-                    sp.string("organization_decr"): params.decr,
+                    sp.string("organization_decr"): sp.utils.bytes_of_string(params.decr),
                 },
                 tkey=sp.TString,
                 tvalue=sp.TBytes
@@ -168,15 +174,22 @@ class OrganizitionFactory(sp.Contract):
 
     @sp.offchain_view()
     def list_organization(self, params):
-        pass
-
-
-    # TODO: complete the callback functions
-
+        """
+        list the organizations by page
+        """
+        sp.set_type(params, t_list_organizations_params)
+        sp.verify(params.offset < self.data.next_organization_id, "offset is overflow")
+        end = params.limit if params.limit + params.offset < self.data.next_organization_id else self.data.next_organization_id
+        index = params.offset
+        result = sp.list()
+        with sp.while_(index < end):
+            result.push(self.data.organizations[index])
+            index += 1
+        sp.set_result_type(sp.TList(t_organization_record))
+        sp.result(result)
 
     @sp.entry_point
     def on_rank_created(self, params):
-
         pass
 
     @sp.entry_point
@@ -206,4 +219,4 @@ class OrganizitionFactory(sp.Contract):
     def on_receive_score(self, params):
         pass
 
-sp.add_compilation_target("TezCard-Main",OrganizitionFactory(sp.record(admin=sp.address("tz1TZBoXYVy26eaBFbTXvbQXVtZc9SdNgedB"))))
+sp.add_compilation_target("TezCard-Main",OrganizationFactory(sp.record(admin=sp.address("tz1TZBoXYVy26eaBFbTXvbQXVtZc9SdNgedB"))))
