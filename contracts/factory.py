@@ -1,6 +1,6 @@
 import smartpy as sp
 
-SBT = sp.io.import_script_from_url("file://organization.py")
+# SBT = sp.io.import_script_from_url("file://organization.py")
 FA2 = sp.io.import_script_from_url("https://smartpy.io/templates/fa2_lib.py")
 
 t_organization_params = sp.TRecord(
@@ -95,6 +95,9 @@ class OrganizationFactory(FA2.Admin, sp.Contract):
             )
         )
 
+    def if_organization_created(self, name):
+        return self.data.organization_names.contains(name)
+
     @sp.entry_point
     def create_organization(self, params):
         """
@@ -102,7 +105,7 @@ class OrganizationFactory(FA2.Admin, sp.Contract):
         """
         sp.set_type(params, t_organization_params)
         sp.verify(self.is_administrator(sp.source), "only administrator can create a new organization")
-        sp.verify(self.data.organization_names.contains(params.name), "Organization is exists")
+        sp.verify(~self.if_organization_created(params.name), "Organization is exists")
         address = sp.self_address
 
         # contract = SBT.Organization(factory_address=address, administrator=self.data.admin, name=params.name, description=params.decr, logo=params.logo) # FIXME: maybe failed
@@ -121,6 +124,9 @@ class OrganizationFactory(FA2.Admin, sp.Contract):
         )
         self.data.organizations[organization_id] = record
 
+    def if_factory_created(self, address):
+        return self.data.factor_addresses.contains(address)
+
     @sp.entry_point
     def add_factor(self, params):
         """
@@ -128,7 +134,7 @@ class OrganizationFactory(FA2.Admin, sp.Contract):
         """
         sp.set_type(params, t_add_factor_params)
         sp.verify(self.is_administrator(sp.source), "only administrator can create a new factor")
-        sp.verify(self.data.factor_addresses.contains(params.address), "factor has already add")
+        sp.verify(~self.if_factory_created(params.address), "factor has already add")
         factor_id = self.data.next_factor_id
         # storage
         self.data.next_factor_id += 1
@@ -142,16 +148,23 @@ class OrganizationFactory(FA2.Admin, sp.Contract):
         )
         self.data.factors[factor_id] = factor
 
+
+    def if_factor_exist(self, factor_id):
+        return self.data.factors.contains(factor_id)
+
     @sp.offchain_view()
-    # @sp.entry_point
     def pause_factor(self, params):
         """
         pause an factor
         """
         sp.set_type(params, t_pause_factor_params)
         sp.verify(self.is_administrator(sp.source), "only administrator can pause a new factor")
-        sp.verify(self.data.factors.contains(params.factor_id), "factor_id not exists")
+        sp.verify(self.if_factor_exist(params.factor_id), "factor_id not exists")
         self.data.factors[params.factor_id].pause = sp.bool(params.pause)
+
+
+    def check_page_factor_offset_limit(self, offset):
+        return offset < self.data.next_factor_id
 
     @sp.offchain_view()
     def list_factors(self, params):
@@ -159,7 +172,7 @@ class OrganizationFactory(FA2.Admin, sp.Contract):
         list the factor by page
         """
         sp.set_type(params, t_list_factor_params)
-        sp.verify(params.offset < self.data.next_factor_id, "offset is overflow")
+        sp.verify(self.check_page_factor_offset_limit(params.offset), "offset is overflow")
         end = params.limit if params.limit + params.offset < self.data.next_factor_id else self.data.next_factor_id
         index = params.offset
         result = sp.list()
@@ -169,13 +182,16 @@ class OrganizationFactory(FA2.Admin, sp.Contract):
         sp.set_result_type(sp.TList(t_factor_record))
         sp.result(result)
 
+    def check_page_organization_offset_limit(self, offset):
+        return offset < self.data.next_organization_id
+
     @sp.offchain_view()
     def list_organization(self, params):
         """
         list the organizations by page
         """
         sp.set_type(params, t_list_organizations_params)
-        sp.verify(params.offset < self.data.next_organization_id, "offset is overflow")
+        sp.verify(self.check_page_organization_offset_limit(params.offset), "offset is overflow")
         end = params.limit if params.limit + params.offset < self.data.next_organization_id else self.data.next_organization_id
         index = params.offset
         result = sp.list()
@@ -275,12 +291,12 @@ def test_list_factor():
     bob = sp.test_account("Bob")
     factory = OrganizationFactory(administrator=alice.address)
     sc += factory
-    factory.list_factors(
+    sc.show(factory.list_factors(
         sp.record(
             offset=sp.nat(1),
             limit=sp.nat(10)
         )
-    ).run(source=bob.address)
+    ).run(source=bob.address))
 
 
 @sp.add_test(name="ListOrganizationTest")
@@ -290,12 +306,12 @@ def test_list_Organization():
     bob = sp.test_account("Bob")
     factory = OrganizationFactory(administrator=alice.address)
     sc += factory
-    factory.list_organization(
+    sc.show(factory.list_organization(
         sp.record(
             offset=sp.nat(1),
             limit=sp.nat(10)
         )
-    ).run(source=bob.address)
+    ).run(source=bob.address))
 
 
 @sp.add_test(name="CreateOrganizationTest")
