@@ -3,7 +3,6 @@ import smartpy as sp
 SBT = sp.io.import_script_from_url("file://organization.py")
 FA2 = sp.io.import_script_from_url("https://smartpy.io/templates/fa2_lib.py")
 
-
 t_organization_params = sp.TRecord(
     name=sp.TBytes,
     logo=sp.TBytes,
@@ -58,10 +57,10 @@ t_list_organizations_params = sp.TRecord(
 #     )
 # )
 
-class OrganizationFactory:
+class OrganizationFactory(FA2.Admin):
     def __init__(self, administrator):
-        sp.init(
-            admin=administrator,
+        FA2.Admin.__init__(self, administrator)
+        self.update_initial_storage(
             # organizations
             next_organization_id=sp.nat(1),
             organizations=sp.big_map(
@@ -100,7 +99,7 @@ class OrganizationFactory:
         create a new organization
         """
         sp.set_type(params, t_organization_params)
-        sp.verify(sp.sender == self.data.admin, "create organization required admin permission")
+        sp.verify(self.is_administrator(sp.source), "only administrator can create a new organization")
         sp.verify(not self.data.organization_names.contains(params.name), "Organization is exists")
         address=sp.self_address
         contract = SBT.Organization(factory_address=address, administrator=self.data.admin, name=params.name, description=params.decr, logo=params.logo) # FIXME: maybe failed
@@ -125,7 +124,7 @@ class OrganizationFactory:
         add a new factor 
         """
         sp.set_type(params, t_add_factor_params)
-        sp.verify(sp.sender == self.data.admin, "add factor required admin permission")
+        sp.verify(self.is_administrator(sp.source), "only administrator can create a new factor")
         sp.verify(not self.data.factor_addresses.contains(params.address), "factor has already add")
         factor_id = self.data.next_factor_id
         # storage
@@ -147,7 +146,7 @@ class OrganizationFactory:
         pause an factor 
         """
         sp.set_type(params, t_pause_factor_params)
-        sp.verify(sp.sender == self.data.admin, "add factor required admin permission")
+        sp.verify(self.is_administrator(sp.source), "only administrator can pause a new factor")
         sp.verify(self.data.factors.contains(params.factor_id), "factor_id not exists")
         self.data.factors[params.factor_id].pause = sp.bool(params.pause)
 
@@ -233,6 +232,65 @@ def test_add_factor():
     sc.verify(factory.data.next_factor_id == sp.nat(2))
     sp.verify(factory.data.factors.contains(sp.nat(1)))
     sp.verify(factory.data.factor_addresses.contains(sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm")))
+
+@sp.add_test(name="PauseFactorTest")
+def test_pause_factor():
+    pass
+    sc = sp.test_scenario()
+    alice = sp.test_account("Alice")
+    bob = sp.test_account("Bob")
+    factory = OrganizationFactory(administrator=alice.address)
+    sc += factory
+    factory.add_factor(
+        sp.record(
+            owner=bob.address,
+            name=sp.bytes("0x12"),
+            address=sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm"),
+            once=sp.bool(False)
+        )
+    ).run(source=bob.address)
+    sc.verify(factory.data.next_factor_id == sp.nat(2))
+    sp.verify(factory.data.factors.contains(sp.nat(1)))
+    sp.verify(factory.data.factor_addresses.contains(sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm")))
+
+    factory.pause_factor(
+        sp.record(
+            factor_id=sp.nat(1),
+            pause=sp.bool(True)
+        )
+    ).run(source=bob.address)
+    sp.verify(factory.data.factors[sp.nat(1)])
+
+
+@sp.add_test(name="ListFactorTest")
+def test_list_factor():
+    pass
+    sc = sp.test_scenario()
+    alice = sp.test_account("Alice")
+    bob = sp.test_account("Bob")
+    factory = OrganizationFactory(administrator=alice.address)
+    sc += factory
+    factory.list_factors(
+        sp.record(
+            offset=sp.nat(1),
+            limit=sp.nat(10)
+        )
+    ).run(source=bob.address)
+
+@sp.add_test(name="ListOrganizationTest")
+def test_list_Organization():
+    pass
+    sc = sp.test_scenario()
+    alice = sp.test_account("Alice")
+    bob = sp.test_account("Bob")
+    factory = OrganizationFactory(administrator=alice.address)
+    sc += factory
+    factory.list_organization(
+        sp.record(
+            offset=sp.nat(1),
+            limit=sp.nat(10)
+        )
+    ).run(source=bob.address)
 
 @sp.add_test(name="CreateOrganizationTest")
 def test_create_organization():
