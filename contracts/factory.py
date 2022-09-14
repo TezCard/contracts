@@ -111,9 +111,8 @@ class OrganizationFactory(FA2.Admin, sp.Contract):
         # contract = SBT.Organization(factory_address=address, administrator=self.data.admin, name=params.name, description=params.decr, logo=params.logo) # FIXME: maybe failed
         # organization_address = sp.create_contract(contract=contract)
         organization_address = sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm")
-        organization_id = self.data.next_organization_id
-        # storage
-        self.data.next_organization_id += 1
+        organization_id = sp.compute(self.data.next_organization_id)
+
         self.data.organization_names[params.name] = sp.unit
         record = sp.record(
             id=organization_id,
@@ -123,6 +122,8 @@ class OrganizationFactory(FA2.Admin, sp.Contract):
             decr=params.decr
         )
         self.data.organizations[organization_id] = record
+        # storage
+        self.data.next_organization_id += 1
 
     def if_factory_created(self, address):
         return self.data.factor_addresses.contains(address)
@@ -135,9 +136,8 @@ class OrganizationFactory(FA2.Admin, sp.Contract):
         sp.set_type(params, t_add_factor_params)
         sp.verify(self.is_administrator(sp.source), "only administrator can create a new factor")
         sp.verify(~self.if_factory_created(params.address), "factor has already add")
-        factor_id = self.data.next_factor_id
-        # storage
-        self.data.next_factor_id += 1
+        factor_id = sp.compute(self.data.next_factor_id)
+
         self.data.factor_addresses[params.address] = sp.unit
         factor = sp.record(
             owner=params.owner,
@@ -147,7 +147,8 @@ class OrganizationFactory(FA2.Admin, sp.Contract):
             once=params.once
         )
         self.data.factors[factor_id] = factor
-
+        # storage
+        self.data.next_factor_id += 1
 
     def if_factor_exist(self, factor_id):
         return self.data.factors.contains(factor_id)
@@ -160,8 +161,7 @@ class OrganizationFactory(FA2.Admin, sp.Contract):
         sp.set_type(params, t_pause_factor_params)
         sp.verify(self.is_administrator(sp.source), "only administrator can pause a new factor")
         sp.verify(self.if_factor_exist(params.factor_id), "factor_id not exists")
-        self.data.factors[params.factor_id].pause = sp.bool(params.pause)
-
+        self.data.factors[params.factor_id].pause = params.pause
 
     def check_page_factor_offset_limit(self, offset):
         return offset < self.data.next_factor_id
@@ -173,13 +173,16 @@ class OrganizationFactory(FA2.Admin, sp.Contract):
         """
         sp.set_type(params, t_list_factor_params)
         sp.verify(self.check_page_factor_offset_limit(params.offset), "offset is overflow")
-        end = params.limit if params.limit + params.offset < self.data.next_factor_id else self.data.next_factor_id
+        with sp.if_(params.limit + params.offset < self.data.next_factor_id):
+            end = params.limit
+        with sp.else_():
+            end = self.data.next_factor_id
         index = params.offset
-        result = sp.list()
+        result = sp.compute(sp.list([]))
         with sp.while_(index < end):
             result.push(self.data.factors[index])
             index += 1
-        sp.set_result_type(sp.TList(t_factor_record))
+        # sp.set_result_type(sp.TList(t_factor_record))
         sp.result(result)
 
     def check_page_organization_offset_limit(self, offset):
@@ -192,13 +195,17 @@ class OrganizationFactory(FA2.Admin, sp.Contract):
         """
         sp.set_type(params, t_list_organizations_params)
         sp.verify(self.check_page_organization_offset_limit(params.offset), "offset is overflow")
-        end = params.limit if params.limit + params.offset < self.data.next_organization_id else self.data.next_organization_id
+        with sp.if_(params.limit + params.offset < self.data.next_organization_id):
+            end = params.limit
+        with sp.else_():
+            end = self.data.next_organization_id
         index = params.offset
-        result = sp.list()
+        result = sp.compute(sp.list([]))
         with sp.while_(index < end):
             result.push(self.data.organizations[index])
             index += 1
-        sp.set_result_type(sp.TList(t_organization_record))
+
+        # sp.set_result_type(sp.TList(t_organization_record))
         sp.result(result)
 
     # @sp.entry_point
@@ -237,7 +244,7 @@ class OrganizationFactory(FA2.Admin, sp.Contract):
 def test_add_factor():
     pass
     sc = sp.test_scenario()
-    alice = sp.test_account("Alice")
+    alice = sp.test_account("Alice1")
     bob = sp.test_account("Bob")
     factory = OrganizationFactory(administrator=alice.address)
     sc += factory
@@ -248,7 +255,7 @@ def test_add_factor():
             address=sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm"),
             once=sp.bool(False)
         )
-    ).run(source=bob.address)
+    ).run(source=alice.address)
     sc.verify(factory.data.next_factor_id == sp.nat(2))
     sc.verify(factory.data.factors.contains(sp.nat(1)))
     sc.verify(factory.data.factor_addresses.contains(sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm")))
@@ -269,7 +276,7 @@ def test_pause_factor():
             address=sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm"),
             once=sp.bool(False)
         )
-    ).run(source=bob.address)
+    ).run(source=alice.address)
     sc.verify(factory.data.next_factor_id == sp.nat(2))
     sc.verify(factory.data.factors.contains(sp.nat(1)))
     sc.verify(factory.data.factor_addresses.contains(sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm")))
@@ -279,39 +286,55 @@ def test_pause_factor():
             factor_id=sp.nat(1),
             pause=sp.bool(True)
         )
-    ).run(source=bob.address)
-    sc.verify(factory.data.factors[sp.nat(1)])
+    )
+    sc.verify(factory.data.factors.contains(sp.nat(1)))
 
 
 @sp.add_test(name="ListFactorTest")
 def test_list_factor():
     pass
     sc = sp.test_scenario()
-    alice = sp.test_account("Alice")
+    alice = sp.test_account("Alice3")
     bob = sp.test_account("Bob")
     factory = OrganizationFactory(administrator=alice.address)
     sc += factory
+    factory.add_factor(
+        sp.record(
+            owner=bob.address,
+            name=sp.bytes("0x12"),
+            address=sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm"),
+            once=sp.bool(False)
+        )
+    ).run(source=alice.address)
     sc.show(factory.list_factors(
         sp.record(
             offset=sp.nat(1),
             limit=sp.nat(10)
         )
-    ).run(source=bob.address))
+    ))
 
 
 @sp.add_test(name="ListOrganizationTest")
 def test_list_Organization():
     sc = sp.test_scenario()
-    alice = sp.test_account("Alice")
+    alice = sp.test_account("Alice2")
     bob = sp.test_account("Bob")
     factory = OrganizationFactory(administrator=alice.address)
     sc += factory
+    factory.create_organization(
+        sp.record(
+            name=sp.bytes("0x01"),
+            logo=sp.bytes("0x12"),
+            decr=sp.bytes("0x13")
+        )
+    ).run(source=alice.address)
+
     sc.show(factory.list_organization(
         sp.record(
             offset=sp.nat(1),
             limit=sp.nat(10)
         )
-    ).run(source=bob.address))
+    ))
 
 
 @sp.add_test(name="CreateOrganizationTest")
@@ -327,7 +350,7 @@ def test_create_organization():
             logo=sp.bytes("0x12"),
             decr=sp.bytes("0x13")
         )
-    ).run(source=bob.address)
+    ).run(source=alice.address)
     sc.verify(factory.data.next_organization_id == sp.nat(2))
     sc.verify(factory.data.organizations.contains(sp.nat(1)))
     sc.verify(factory.data.organization_names.contains(sp.bytes("0x01")))
