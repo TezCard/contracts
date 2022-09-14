@@ -1,21 +1,45 @@
-
+contracts/file
 Factory 合约 ：
-1. create_organization（entry point） create合约
-2. add_factor (entry_point) 添加因子
-3. pause_factor(entry_point, offchain_view) 暂停因子
+1. create_organization(sp.record(name=sp.TBytes,
+                            logo=sp.TBytes,
+                            decr=sp.TBytes)) create合约
+2. add_factor(sp.record(owner=sp.TAddress,
+    name=sp.TBytes,
+    address=sp.TAddress,
+    once=sp.TBool)) 添加因子
+3. pause_factor(sp.record(factor_id=sp.TNat,
+    pause=sp.TBool)) 暂停因子
 4. list_factors(offchain_view) 查询因子
 5. list_organization(offchain_view) 查询合约
 
 
 Organization合约
-1.create_soul_bottle(entry_point)
-2.create_madel_rank(entry_point)
-3. start_madel_rank(entry_point)
-4. join_madel_rank(entry_point)
-5. receive_madel_rank_score(entry_point)
-6. madel_rank_details(offchain_view)
+1.create_soul_bottle(sp.record(
+    name=sp.TBytes,
+    introduce=sp.TBytes,
+    logo=sp.TBytes))
+2.create_madel_rank(sp.record(
+    name=sp.TBytes,
+    description=sp.TBytes,
+    factors=sp.TMap(sp.TAddress, sp.TNat),
+    parameter=sp.record(
+        threshold_score_limit=sp.TNat,
+        threshold_member_limit=sp.TOption(sp.TNat)
+    ),
+    time_elapsed=sp.TRecord(
+        threshold_block_level=sp.TNat,
+        threshold_member_limit=sp.TNat
+    )))
+3. start_madel_rank(sp.record(
+        rank_id=sp.TNat))
+4. join_madel_rank(sp.record(
+        rank_id=sp.TNat))
+5. receive_madel_rank_score(sp.record(
+    rank_id=sp.TNat,
+    address=sp.TAddress,
+    score=sp.TNat))
+6. madel_rank_details(rank_id)
 7. list_my_participated_ranks(offchain_view)
 8. list_my_madels(offchain_view)
-9. is_madel_rank_open(offchain_view)
-10. is_madel_rank_open(offchain_view)
-11. organization_details(offchain_view)
+9. is_madel_rank_open(rank_id)
+10. organization_details(offchain_view)
