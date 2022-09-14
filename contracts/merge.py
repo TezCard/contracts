@@ -1,8 +1,3 @@
-import smartpy as sp
-
-# SBT = sp.io.import_script_from_url("file:contracts/organization.py")
-FA2 = sp.io.import_script_from_url("https://smartpy.io/templates/fa2_lib.py")
-
 """
 TezCard Soul Bounded Token
 """
@@ -35,8 +30,9 @@ t_madel_record = sp.TRecord(
     candidates=sp.TMap(sp.TAddress, sp.TNat),
     winners=sp.TList(sp.TAddress),
     max_score=sp.TNat,
-    min_score=sp.TNat,
+    min_score=sp.TNat, 
 )
+
 
 t_my_madel_record = sp.TRecord(
     block_level=sp.TNat,
@@ -50,7 +46,7 @@ t_organization_result = sp.TRecord(
     logo=sp.TBytes
 ).layout(("name", ("description", "logo")))
 
-t_soul_profile_params = sp.TRecord(
+t_soul_profile_params=sp.TRecord(
     name=sp.TBytes,
     introduce=sp.TBytes,
     logo=sp.TBytes
@@ -74,6 +70,7 @@ t_my_madel_details = sp.TRecord(
     block_level=sp.TNat
 )
 
+
 t_factor_receive_score_param = sp.TRecord(
     rank_id=sp.TNat,
     address=sp.TAddress,
@@ -85,20 +82,50 @@ t_join_madel_rank_param = sp.TRecord(
 )
 
 
-# t_list_madel_ranks_params = sp.TVariant(
-#     opened=sp.TRecord(
+t_organization_params = sp.TRecord(
+    name=sp.TBytes,
+    logo=sp.TBytes,
+    decr=sp.TBytes
+).layout(("name", ("logo", "decr")))
 
-#     ),
-#     ended=sp.TRecord(
+t_organization_record = sp.TRecord(
+    id=sp.TNat,
+    address=sp.TAddress,
+    name=sp.TBytes,
+    logo=sp.TBytes,
+    decr=sp.TBytes,
+    timestamp=sp.TTimestamp
+).layout(("id", ("address", ("name", ("logo", ("decr", "timestamp"))))))
 
-#     ),
-#     started=sp.TRecord(
+t_add_factor_params = sp.TRecord(
+    owner=sp.TAddress,
+    name=sp.TBytes,
+    address=sp.TAddress,
+    once=sp.TBool
+).layout(("owner", ("name", ("address", "once"))))
 
-#     ),
-#     all=sp.TRecord(
+t_factor_record = sp.TRecord(
+    owner=sp.TAddress,
+    name=sp.TBytes,
+    address=sp.TAddress,
+    pause=sp.TBool,
+    once=sp.TBool
+).layout(("owner", ("name", ("address", ("pause", "once")))))
 
-#     )
-# )
+t_pause_factor_params = sp.TRecord(
+    factor_id=sp.TNat,
+    pause=sp.TBool
+).layout(("factor_id", "pause"))
+
+t_list_factor_params = sp.TRecord(
+    offset=sp.TNat,
+    limit=sp.TNat
+).layout(("offset", "limit"))
+
+t_list_organizations_params = sp.TRecord(
+    offset=sp.TNat,
+    limit=sp.TNat
+).layout(("offset", "limit"))
 
 class Organization(FA2.Fa2Nft,
                    FA2.OffchainviewTokenMetadata,
@@ -124,7 +151,7 @@ class Organization(FA2.Fa2Nft,
         FA2.Admin.__init__(self, sp.address("tz1000000000000000000000000000000000"))
 
     def if_soul_bottle_minted(self, address):
-        return self.data.members.contains(address)
+        return self.data.members.contains(address) 
 
     @sp.entry_point
     def create_soul_bottle(self, params):
@@ -135,8 +162,8 @@ class Organization(FA2.Fa2Nft,
         sp.verify(~self.if_soul_bottle_minted(sp.source), "you have minted a soul bottle")
         token_id = sp.compute(self.data.last_token_id)
         metadata = sp.record(
-            token_id=token_id,
-            token_info=sp.map(l={
+            token_id = token_id,
+            token_info = sp.map(l={
                 "soul_name": params.name,
                 "soul_introduce": params.introduce,
                 "soul_logo": params.logo,
@@ -146,7 +173,7 @@ class Organization(FA2.Fa2Nft,
         self.data.ledger[token_id] = sp.source
         self.data.members[sp.source] = token_id
         self.data.last_token_id += 1
-
+    
     @sp.entry_point
     def create_madel_rank(self, params):
         """
@@ -162,7 +189,7 @@ class Organization(FA2.Fa2Nft,
             contract = sp.contract(
                 sp.TRecord(
                     organization_address=sp.TAddress,
-                    rank_id=sp.TNat,
+                    rank_id = sp.TNat,
                 ),
                 factor,
                 "register"
@@ -175,8 +202,8 @@ class Organization(FA2.Fa2Nft,
                 sp.tez(0),
                 contract
             )
-
-        # save in the organization records
+        
+        # save in the organization records 
         record = sp.record(
             name=params.name,
             description=params.description,
@@ -187,7 +214,7 @@ class Organization(FA2.Fa2Nft,
             candidates=sp.map(l={}, tkey=sp.TAddress, tvalue=sp.TNat),
             winners=sp.list(l=[], t=sp.TAddress),
             max_score=sp.nat(0),
-            min_score=sp.nat(0),
+            min_score=sp.nat(0), 
         )
         self.data.madels[rank_id] = record
 
@@ -211,7 +238,7 @@ class Organization(FA2.Fa2Nft,
         sp.verify(self.data.opened_madel_ranks.contains(params.rank_id), "madel rank must be opened")
         # move to the started list
         self.data.started_madel_ranks[params.rank_id] = sp.unit
-        self.data.madels[params.rank_id].open = sp.bool(True)
+        self.data.madels[params.rank_id].open=sp.bool(True)
         del self.data.opened_madel_ranks[params.rank_id]
 
     # @sp.entry_point
@@ -255,13 +282,14 @@ class Organization(FA2.Fa2Nft,
             )
 
     def calculate_fixed_score_rank(
-            self,
-            rank_id,
-            factor_address,
-            wallet_address,
-            score,
-            score_limit,
-            memeber_limit):
+        self, 
+        rank_id,
+        factor_address, 
+        wallet_address, 
+        score, 
+        score_limit, 
+        memeber_limit):
+
         rank = self.data.madels[rank_id]
         candidate_score = rank.candidates[wallet_address]
         factor_weight = rank.factors[factor_address]
@@ -281,12 +309,12 @@ class Organization(FA2.Fa2Nft,
                     winners.push(wallet_address)
             with sp.else_():
                 rank.end = sp.bool(True)
-            rank.winners = winners
+            rank.winners=winners
             self.data.madels[rank_id] = rank
         with sp.else_():
             with sp.if_(now_score >= score_limit):
                 winners.push(wallet_address)
-            rank.winners = winners
+            rank.winners=winners
             self.data.madels[rank_id] = rank
 
     @sp.offchain_view()
@@ -350,224 +378,6 @@ class Organization(FA2.Fa2Nft,
         )
 
 
-class TestOrganizationFactory(sp.Contract):
-    def __init__(self, administrator):
-        self.init(
-            administrator=administrator
-        )
-
-
-class TestFactorContract(sp.Contract):
-    def __init__(self):
-        self.init(
-            ranks=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TMap(sp.TNat, sp.TUnit))
-        )
-
-    @sp.entry_point
-    def register(self, params):
-        sp.set_type(
-            params,
-            sp.TRecord(
-                organization_address=sp.TAddress,
-                rank_id=sp.TNat,
-            )
-        )
-        with sp.if_(self.data.ranks.contains(params.organization_address)):
-            self.data.ranks[params.organization_address][params.rank_id] = sp.unit
-        with sp.else_():
-            self.data.ranks[params.organization_address] = sp.map(
-                l={
-                    params.rank_id: sp.unit
-                },
-                tkey=sp.TNat,
-                tvalue=sp.TUnit
-            )
-
-    @sp.entry_point
-    def unregister(self, params):
-        sp.set_type(
-            params,
-            sp.TRecord(
-                organization=sp.TAddress,
-                rank_id=sp.TNat
-            )
-        )
-        sp.verify(self.data.ranks.contains(params.organization))
-        sp.verify(self.data.ranks[params.organization].contains(params.rank_id))
-        del self.data.ranks[params.organization][params.rank_id]
-
-    @sp.entry_point
-    def on_candidate_join(self, params):
-        sp.set_type(
-            params,
-            sp.TRecord(
-                organization=sp.TAddress,
-                rank_id=sp.TNat,
-                candidate=sp.TAddress
-            )
-        )
-
-    @sp.entry_point
-    def on_candidate_leave(self, params):
-        sp.set_type(
-            params,
-            sp.TRecord(
-                organization=sp.TAddress,
-                rank_id=sp.TNat,
-                candidate=sp.TAddress
-            )
-        )
-
-
-@sp.add_test(name="MintSoulBottleTest")
-def mint_soul_bottle_test():
-    sc = sp.test_scenario()
-    alice = sp.test_account("Alice")
-    bob = sp.test_account("Bob")
-    factory = TestOrganizationFactory(administrator=alice.address)
-    sc += factory
-    organization = Organization()
-    organization.update_initial_storage(
-        factory_address=factory.address,
-        administrator=alice.address,
-        name=sp.bytes("0x01"),
-        description=sp.bytes("0x02"),
-        logo=sp.bytes("0x03"),
-        members=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TNat),
-        next_madel_id=sp.nat(1),
-        madels=sp.big_map({}, tkey=sp.TNat, tvalue=t_madel_record),
-        opened_madel_ranks=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
-        ended_madel_ranks=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
-        started_madel_ranks=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
-        my_participated_ranks=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TMap(sp.TNat, sp.TUnit)),
-        my_madels=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TMap(sp.TNat, sp.TNat)),
-    )
-    sc += organization
-    sc.verify(organization.data.last_token_id == sp.nat(0))
-    # success
-    organization.create_soul_bottle(
-        sp.record(
-            name=sp.bytes("0x01"),
-            introduce=sp.bytes("0x02"),
-            logo=sp.bytes("0x03")
-        )
-    ).run(source=bob.address)
-    sc.verify(organization.data.last_token_id == sp.nat(1))
-
-
-@sp.add_test(name="CreateMadelRankTest")
-def create_madel_rank_test():
-    pass
-    sc = sp.test_scenario()
-    alice = sp.test_account("Alice")
-    bob = sp.test_account("Bob")
-    factory = TestOrganizationFactory(administrator=alice.address)
-    factor = TestFactorContract()
-    factor2 = TestFactorContract()
-    sc += factory
-    sc += factor
-    sc += factor2
-    organization = Organization()
-    organization.update_initial_storage(
-        factory_address=factory.address,
-        administrator=alice.address,
-        name=sp.bytes("0x01"),
-        description=sp.bytes("0x02"),
-        logo=sp.bytes("0x03"),
-        members=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TNat),
-        next_madel_id=sp.nat(1),
-        madels=sp.big_map({}, tkey=sp.TNat, tvalue=t_madel_record),
-        opened_madel_ranks=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
-        ended_madel_ranks=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
-        started_madel_ranks=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
-        my_participated_ranks=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TMap(sp.TNat, sp.TUnit)),
-        my_madels=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TMap(sp.TNat, sp.TNat)),
-    )
-    sc += organization
-    sc.verify(organization.data.last_token_id == sp.nat(0))
-    # create
-    organization.create_madel_rank(
-        sp.record(
-            name=sp.bytes("0x01"),
-            description=sp.bytes("0x02"),
-            factors=sp.map(
-                l={
-                    factor.address: sp.nat(10),
-                    factor2.address: sp.nat(20),
-                },
-                tkey=sp.TAddress,
-                tvalue=sp.TNat
-            ),
-            parameter=sp.variant("fixed_score", sp.record(
-                threshold_score_limit=sp.nat(20),
-                threshold_member_limit=sp.none
-            ))
-        )
-    ).run(source=alice.address)
-
-    sc.verify(organization.data.next_madel_id == sp.nat(2))
-    sc.verify(organization.data.opened_madel_ranks.contains(sp.nat(1)))
-    sc.verify(factor.data.ranks.contains(organization.address))
-    sc.verify(factor2.data.ranks.contains(organization.address))
-    sc.verify(factor.data.ranks[organization.address].contains(sp.nat(1)))
-
-t_organization_params = sp.TRecord(
-    name=sp.TBytes,
-    logo=sp.TBytes,
-    decr=sp.TBytes
-).layout(("name", ("logo", "decr")))
-
-t_organization_record = sp.TRecord(
-    id=sp.TNat,
-    address=sp.TAddress,
-    name=sp.TBytes,
-    logo=sp.TBytes,
-    decr=sp.TBytes,
-    timestamp=sp.TTimestamp
-).layout(("id", ("address", ("name", ("logo", ("decr", "timestamp"))))))
-
-t_add_factor_params = sp.TRecord(
-    owner=sp.TAddress,
-    name=sp.TBytes,
-    address=sp.TAddress,
-    once=sp.TBool
-).layout(("owner", ("name", ("address", "once"))))
-
-t_factor_record = sp.TRecord(
-    owner=sp.TAddress,
-    name=sp.TBytes,
-    address=sp.TAddress,
-    pause=sp.TBool,
-    once=sp.TBool
-).layout(("owner", ("name", ("address", ("pause", "once")))))
-
-t_pause_factor_params = sp.TRecord(
-    factor_id=sp.TNat,
-    pause=sp.TBool
-).layout(("factor_id", "pause"))
-
-t_list_factor_params = sp.TRecord(
-    offset=sp.TNat,
-    limit=sp.TNat
-).layout(("offset", "limit"))
-
-t_list_organizations_params = sp.TRecord(
-    offset=sp.TNat,
-    limit=sp.TNat
-).layout(("offset", "limit"))
-
-
-#
-# t_rank_variables = sp.TVariant(
-#     fixed_rank=sp.TRecord(
-#         threshold_score=sp.TNat
-#     ),
-#     time_elapsed=sp.TRecord(
-#         threshold_block_level=sp.TNat,
-#         threshold_member_count=sp.TNat
-#     )
-# )
-
 class OrganizationFactory(sp.Contract):
     def __init__(self, administrator):
         # FA2.Admin.__init__(self, administrator)
@@ -630,7 +440,7 @@ class OrganizationFactory(sp.Contract):
                 last_token_id=sp.nat(0),
                 ledger=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TAddress),
                 logo=params.logo,
-                madels = sp.big_map({}, tkey=sp.TNat, tvalue=SBT.t_madel_record),
+                madels = sp.big_map({}, tkey=sp.TNat, tvalue=t_madel_record),
                 members = sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TNat),
                 metadata = sp.big_map({}, tkey=sp.TString, tvalue=sp.TBytes),
                 my_madels = sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TMap(sp.TNat, sp.TNat)),
@@ -641,7 +451,7 @@ class OrganizationFactory(sp.Contract):
                 operators = sp.big_map({}, tkey=FA2.t_operator_permission, tvalue=sp.TUnit),
                 started_madel_ranks = sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
                 token_metadata = sp.big_map({}, tkey=sp.TNat, tvalue=sp.TRecord(
-                    token_id = sp.TNat,
+                    token_id = sp.TNat, 
                     token_info = sp.TMap(sp.TString, sp.TBytes)
                 ))
             ),
@@ -812,168 +622,6 @@ class OrganizationFactory(sp.Contract):
     # @sp.entry_point
     # def on_receive_score(self, params):
     #     pass
-
-
-@sp.add_test(name="AddFactorTest")
-def test_add_factor():
-    pass
-    sc = sp.test_scenario()
-    alice = sp.test_account("Alice1")
-    bob = sp.test_account("Bob")
-    factory = OrganizationFactory(administrator=alice.address)
-    sc += factory
-    factory.add_factor(
-        sp.record(
-            owner=bob.address,
-            name=sp.bytes("0x12"),
-            address=sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm"),
-            once=sp.bool(False)
-        )
-    ).run(source=alice.address)
-    sc.verify(factory.data.next_factor_id == sp.nat(2))
-    sc.verify(factory.data.factors.contains(sp.nat(1)))
-    sc.verify(factory.data.factor_addresses.contains(sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm")))
-
-
-@sp.add_test(name="PauseFactorTest")
-def test_pause_factor():
-    pass
-    sc = sp.test_scenario()
-    alice = sp.test_account("Alice")
-    bob = sp.test_account("Bob")
-    factory = OrganizationFactory(administrator=alice.address)
-    sc += factory
-    factory.add_factor(
-        sp.record(
-            owner=bob.address,
-            name=sp.bytes("0x12"),
-            address=sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm"),
-            once=sp.bool(False)
-        )
-    ).run(source=alice.address)
-    sc.verify(factory.data.next_factor_id == sp.nat(2))
-    sc.verify(factory.data.factors.contains(sp.nat(1)))
-    sc.verify(factory.data.factor_addresses.contains(sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm")))
-
-    factory.pause_factor(
-        sp.record(
-            factor_id=sp.nat(1),
-            pause=sp.bool(True)
-        )
-    )
-    sc.verify(factory.data.factors.contains(sp.nat(1)))
-
-
-@sp.add_test(name="ListFactorTest")
-def test_list_factor():
-    pass
-    sc = sp.test_scenario()
-    alice = sp.test_account("Alice3")
-    bob = sp.test_account("Bob")
-    factory = OrganizationFactory(administrator=alice.address)
-    sc += factory
-    factory.add_factor(
-        sp.record(
-            owner=bob.address,
-            name=sp.bytes("0x12"),
-            address=sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm"),
-            once=sp.bool(False)
-        )
-    ).run(source=alice.address)
-    sc.show(factory.list_factors(
-        sp.record(
-            offset=sp.nat(1),
-            limit=sp.nat(10)
-        )
-    ))
-
-
-@sp.add_test(name="ListOrganizationTest")
-def test_list_Organization():
-    sc = sp.test_scenario()
-    alice = sp.test_account("Alice2")
-    bob = sp.test_account("Bob")
-    factory = OrganizationFactory(administrator=alice.address)
-    sc += factory
-    factory.create_organization(
-        sp.record(
-            name=sp.bytes("0x01"),
-            logo=sp.bytes("0x12"),
-            decr=sp.bytes("0x13")
-        )
-    ).run(source=alice.address)
-
-    sc.show(factory.list_organization(
-        sp.record(
-            offset=sp.nat(1),
-            limit=sp.nat(10)
-        )
-    ))
-
-
-@sp.add_test(name="CreateOrganizationTest")
-def test_create_organization():
-    sc = sp.test_scenario()
-    alice = sp.test_account("Alice")
-    bob = sp.test_account("Bob")
-    factory = OrganizationFactory(administrator=alice.address)
-    sc += factory
-    factory.create_organization(
-        sp.record(
-            name=sp.bytes("0x01"),
-            logo=sp.bytes("0x12"),
-            decr=sp.bytes("0x13")
-        )
-    ).run(source=alice.address)
-    sc.verify(factory.data.next_organization_id == sp.nat(2))
-    sc.verify(factory.data.organizations.contains(sp.nat(1)))
-    sc.verify(factory.data.organization_names.contains(sp.bytes("0x01")))
-
-
-@sp.add_test(name="ListMyCreatedOrganizationTest")
-def test_my_created_organization():
-    sc = sp.test_scenario()
-    alice = sp.test_account("Alice2")
-    bob = sp.test_account("Bob")
-    factory = OrganizationFactory(administrator=alice.address)
-    sc += factory
-    factory.create_organization(
-        sp.record(
-            name=sp.bytes("0x01"),
-            logo=sp.bytes("0x12"),
-            decr=sp.bytes("0x13")
-        )
-    ).run(source=alice.address)
-
-    sc.show(factory.list_my_created_organization(
-        sp.record(
-            offset=sp.nat(1),
-            limit=sp.nat(10)
-        )
-    ).run(source=alice.address))
-
-
-@sp.add_test(name="ListMyJoinedOrganizationTest")
-def test_my_joined_organization():
-    sc = sp.test_scenario()
-    alice = sp.test_account("Alice2")
-    bob = sp.test_account("Bob")
-    factory = OrganizationFactory(administrator=alice.address)
-    sc += factory
-    factory.create_organization(
-        sp.record(
-            name=sp.bytes("0x01"),
-            logo=sp.bytes("0x12"),
-            decr=sp.bytes("0x13")
-        )
-    ).run(source=alice.address)
-
-    sc.show(factory.list_my_join_organization(
-        sp.record(
-            offset=sp.nat(1),
-            limit=sp.nat(10)
-        )
-    ).run(source=alice.address))
 
 
 sp.add_compilation_target("TezCard-Main",

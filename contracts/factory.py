@@ -107,12 +107,8 @@ class OrganizationFactory(sp.Contract):
         any one has permission to create
         """
         sp.set_type(params, t_organization_params)
-        # sp.verify(self.is_administrator(sp.source), "only administrator can create a new organization")
         sp.verify(~self.if_organization_created(params.name), "Organization is exists")
-        address = sp.self_address
 
-        # contract = SBT.Organization(factory_address=address, administrator=self.data.admin, name=params.name, description=params.decr, logo=params.logo) # FIXME: maybe failed
-        #organization_address = sp.create_contract(contract=contract)
         organization_address = sp.create_contract(
             storage=sp.record(
                 administrator=sp.source,
@@ -139,9 +135,7 @@ class OrganizationFactory(sp.Contract):
             ),
             contract=self.initial_organization_contract
         )
-        #organization_address = sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm")
         organization_id = sp.compute(self.data.next_organization_id)
-
         self.data.organization_names[params.name] = sp.unit
         timeStamp = sp.now
         record = sp.record(
@@ -155,8 +149,13 @@ class OrganizationFactory(sp.Contract):
         self.data.organizations[organization_id] = record
         # storage
         self.data.next_organization_id += 1
-        self.data.my_created_organizations[sp.sender][organization_id] = record
-        self.data.my_joined_organizations[sp.sender][organization_id] = record
+        created_organizations = sp.compute(self.data.my_created_organizations.get(sp.sender, default_value={}))
+        created_organizations[organization_id] = record
+        self.data.my_created_organizations = created_organizations
+        
+        joined_organizations = sp.compute(self.data.my_joined_organizations.get(sp.sender, default_value={}))
+        joined_organizations[organization_id] = record
+        self.data.my_joined_organizations = joined_organizations
 
     def if_factory_created(self, address):
         return self.data.factor_addresses.contains(address)
@@ -469,4 +468,4 @@ def test_my_joined_organization():
 
 
 sp.add_compilation_target("TezCard-Main",
-                          OrganizationFactory(sp.record(admin=sp.address("tz1TZBoXYVy26eaBFbTXvbQXVtZc9SdNgedB"))))
+                          OrganizationFactory(sp.record(administrator=sp.address("tz1TZBoXYVy26eaBFbTXvbQXVtZc9SdNgedB"))))
