@@ -1,31 +1,33 @@
 import smartpy as sp
 
-SBT = sp.io.import_script_from_url("file://.py")
+SBT = sp.io.import_script_from_url("file://organization.py")
 FA2 = sp.io.import_script_from_url("https://smartpy.io/templates/fa2_lib.py")
 
 
 t_organization_params = sp.TRecord(
-    managers=sp.TMap(sp.TAddress, sp.TUnit),
     name=sp.TBytes,
     logo=sp.TBytes,
-    decr=sp.TString,
-).layout(("managers", ("name", ("logo", "decr"))))
+    decr=sp.TBytes
+).layout(("name", ("logo", "decr")))
 
 t_organization_record = sp.TRecord(
     id=sp.TNat,
     address=sp.TAddress,
-).layout(("id", "address"))
+    name=sp.TBytes,
+    logo=sp.TBytes,
+    decr=sp.TBytes
+).layout(("id", ("address", ("name", ("logo", "decr")))))
 
 t_add_factor_params = sp.TRecord(
     owner=sp.TAddress,
-    name=sp.TString,
+    name=sp.TBytes,
     address=sp.TAddress,
     once=sp.TBool
 ).layout(("owner", ("name", ("address", "once"))))
 
 t_factor_record = sp.TRecord(
     owner=sp.TAddress,
-    name=sp.TString,
+    name=sp.TBytes,
     address=sp.TAddress,
     pause=sp.TBool,
     once=sp.TBool
@@ -41,29 +43,25 @@ t_list_factor_params = sp.TRecord(
     limit=sp.TNat
 ).layout(("offset", "limit"))
 
-
 t_list_organizations_params = sp.TRecord(
     offset=sp.TNat,
     limit=sp.TNat
 ).layout(("offset", "limit"))
+#
+# t_rank_variables = sp.TVariant(
+#     fixed_rank=sp.TRecord(
+#         threshold_score=sp.TNat
+#     ),
+#     time_elapsed=sp.TRecord(
+#         threshold_block_level=sp.TNat,
+#         threshold_member_count=sp.TNat
+#     )
+# )
 
-t_rank_variables = sp.TVariant(
-    fixed_rank=sp.TRecord(
-        threshold_score=sp.TNat
-    ),
-    time_elapsed=sp.TRecord(
-        threshold_block_level=sp.TNat,
-        threshold_member_count=sp.TNat
-    )
-)
-
-class OrganizationFactory(sp.Contract):
-    def __init__(self, params):
-        sp.set_type(params, sp.TRecord(
-            admin=sp.TAddress,
-        ).layout(("admin")))
+class OrganizationFactory:
+    def __init__(self, administrator):
         sp.init(
-            admin=params.admin,
+            admin=administrator,
             # organizations
             next_organization_id=sp.nat(1),
             organizations=sp.big_map(
@@ -71,25 +69,29 @@ class OrganizationFactory(sp.Contract):
                 tvalue=t_organization_record
             ),
             organization_names=sp.big_map(
-                tkey=sp.TString,
+                tkey=sp.TBytes,
                 tvalue=sp.TUnit
             ),
-            # record the organizition
-            my_created_organizations=sp.big_map(
-                tkey=sp.TNat,
-                tvalue=sp.TSet(sp.TNat)
-            ),
-
-            my_joined_organizations=sp.big_map(
-                tkey=sp.TAddress,
-                tvalue=sp.TSet(sp.TNat)
-            ),
+            # # record the organizition
+            # my_created_organizations=sp.big_map(
+            #     tkey=sp.TNat,
+            #     tvalue=sp.TUnit
+            # ),
+            #
+            # my_joined_organizations=sp.big_map(
+            #     tkey=sp.TAddress,
+            #     tvalue=sp.TUnit
+            # ),
             # factors
             next_factor_id=sp.nat(1),
             factors=sp.big_map(
                 tkey=sp.TNat,
                 tvalue=t_factor_record
             ),
+            factor_addresses=sp.big_map(
+                tkey=sp.TAddress,
+                tvalue=sp.TUnit
+            )
         )
 
     @sp.entry_point
@@ -101,20 +103,7 @@ class OrganizationFactory(sp.Contract):
         sp.verify(sp.sender == self.data.admin, "create organization required admin permission")
         sp.verify(not self.data.organization_names.contains(params.name), "Organization is exists")
         address=sp.self_address
-        init_param = sp.record(
-            factory=address,
-            managers=params.managers,
-            metadata=sp.map(
-                {
-                    sp.string("organization_name"): params.name,
-                    sp.string("organization_logo"): params.logo,
-                    sp.string("organization_decr"): sp.utils.bytes_of_string(params.decr),
-                },
-                tkey=sp.TString,
-                tvalue=sp.TBytes
-            )
-        )
-        contract = SBT.Organization(init_param) # FIXME: maybe failed
+        contract = SBT.Organization(factory_address=address, administrator=self.data.admin, name=params.name, description=params.decr, logo=params.logo) # FIXME: maybe failed
         organization_address = sp.create_contract(contract=contract)
         organization_id = self.data.next_organization_id
         # storage
@@ -123,6 +112,9 @@ class OrganizationFactory(sp.Contract):
         record = sp.record(
             id=organization_id,
             address=organization_address,
+            name=params.name,
+            logo=params.logo,
+            decr=params.decr
         )
         self.data.organizations[organization_id] = record
 
@@ -134,7 +126,11 @@ class OrganizationFactory(sp.Contract):
         """
         sp.set_type(params, t_add_factor_params)
         sp.verify(sp.sender == self.data.admin, "add factor required admin permission")
+        sp.verify(not self.data.factor_addresses.contains(params.address), "factor has already add")
         factor_id = self.data.next_factor_id
+        # storage
+        self.data.next_factor_id += 1
+        self.data.factor_addresses[params.address] = sp.unit
         factor = sp.record(
             owner=params.owner,
             address=params.address,
@@ -143,7 +139,6 @@ class OrganizationFactory(sp.Contract):
             once=params.once
         )
         self.data.factors[factor_id] = factor
-        self.data.next_factor_id += 1
 
     @sp.offchain_view()
     @sp.entry_point
@@ -188,35 +183,76 @@ class OrganizationFactory(sp.Contract):
         sp.set_result_type(sp.TList(t_organization_record))
         sp.result(result)
 
-    @sp.entry_point
-    def on_rank_created(self, params):
-        pass
+    # @sp.entry_point
+    # def on_rank_created(self, params):
+    #     pass
+    #
+    # @sp.entry_point
+    # def on_rank_open(self, params):
+    #     pass
+    #
+    # @sp.entry_point
+    # def on_rank_closed(self, params):
+    #     pass
+    #
+    # @sp.entry_point
+    # def on_member_join_rank(self, params):
+    #     """
+    #     someone join the rank
+    #     """
+    #     pass
+    #
+    # @sp.entry_point
+    # def on_member_leave_rank(self, params):
+    #     pass
+    #
+    # @sp.entry_point
+    # def on_member_mint(self, params):
+    #     pass
+    #
+    # @sp.entry_point
+    # def on_receive_score(self, params):
+    #     pass
 
-    @sp.entry_point
-    def on_rank_open(self, params):
-        pass
+@sp.add_test(name="AddFactorTest")
+def test_add_factor():
+    pass
+    sc = sp.test_scenario()
+    alice = sp.test_account("Alice")
+    bob = sp.test_account("Bob")
+    factory = OrganizationFactory(administrator=alice.address)
+    sc += factory
+    factory.add_factor(
+        sp.record(
+            owner=bob.address,
+            name=sp.bytes("0x12"),
+            address=sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm"),
+            once=sp.bool(False)
+        )
+    ).run(source=bob.address)
+    sc.verify(factory.data.next_factor_id == sp.nat(2))
+    sp.verify(factory.data.factors.contains(sp.nat(1)))
+    sp.verify(factory.data.factor_addresses.contains(sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm")))
 
-    @sp.entry_point
-    def on_rank_closed(self, params):
-        pass
+@sp.add_test(name="CreateOrganizationTest")
+def test_create_organization():
+    pass
+    sc = sp.test_scenario()
+    alice = sp.test_account("Alice")
+    bob = sp.test_account("Bob")
+    factory = OrganizationFactory(administrator=alice.address)
+    sc += factory
+    factory.create_organization(
+        sp.record(
+            name = sp.bytes("0x01"),
+            logo = sp.bytes("0x12"),
+            decr = sp.bytes("0x13")
+        )
+    ).run(source=bob.address)
+    sc.verify(factory.data.next_organization_id == sp.nat(2))
+    sp.verify(factory.data.organizations.contains(sp.nat(1)))
+    sp.verify(factory.data.organization_names.contains(sp.bytes("0x01")))
 
-    @sp.entry_point
-    def on_member_join_rank(self, params):
-        """
-        someone join the rank
-        """
-        pass
 
-    @sp.entry_point
-    def on_member_leave_rank(self, params):
-        pass
-
-    @sp.entry_point
-    def on_member_mint(self, params):
-        pass
-
-    @sp.entry_point
-    def on_receive_score(self, params):
-        pass
 
 sp.add_compilation_target("TezCard-Main",OrganizationFactory(sp.record(admin=sp.address("tz1TZBoXYVy26eaBFbTXvbQXVtZc9SdNgedB"))))
