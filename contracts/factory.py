@@ -1,6 +1,6 @@
 import smartpy as sp
 
-SBT = sp.io.import_script_from_url("file://organization.py")
+SBT = sp.io.import_script_from_url("file:contracts/organization.py")
 FA2 = sp.io.import_script_from_url("https://smartpy.io/templates/fa2_lib.py")
 
 t_organization_params = sp.TRecord(
@@ -94,6 +94,7 @@ class OrganizationFactory(FA2.Admin, sp.Contract):
                 tvalue=sp.TUnit
             )
         )
+        self.initial_organization = SBT.Organization()
 
     @sp.entry_point
     def create_organization(self, params):
@@ -106,7 +107,7 @@ class OrganizationFactory(FA2.Admin, sp.Contract):
         address = sp.self_address
 
         # contract = SBT.Organization(factory_address=address, administrator=self.data.admin, name=params.name, description=params.decr, logo=params.logo) # FIXME: maybe failed
-        # organization_address = sp.create_contract(contract=contract)
+        #organization_address = sp.create_contract(contract=contract)
         organization_address = sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm")
         organization_id = self.data.next_organization_id
         # storage

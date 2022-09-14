@@ -101,13 +101,13 @@ class Organization(FA2.Fa2Nft,
                    FA2.Admin,
                    FA2.OnchainviewBalanceOf):
 
-    def __init__(self, factory_address, administrator, name, description, logo):
+    def __init__(self):
         FA2.Fa2Nft.__init__(self, metadata=sp.big_map(l=None, tkey=sp.TString, tvalue=sp.TBytes))
         self.update_initial_storage(
-            factory_address=factory_address,
-            name=name,
-            description=description,
-            logo=logo,
+            factory_address=sp.address("KT1000000000000000000000000000000000"),
+            name=sp.bytes("0x00"),
+            description=sp.bytes("0x00"),
+            logo=sp.bytes("0x00"),
             members=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TNat),
             next_madel_id=sp.nat(1),
             madels=sp.big_map({}, tkey=sp.TNat, tvalue=t_madel_record),
@@ -117,7 +117,7 @@ class Organization(FA2.Fa2Nft,
             my_participated_ranks=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TMap(sp.TNat, sp.TUnit)),
             my_madels=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TMap(sp.TNat, sp.TNat)),
         )
-        FA2.Admin.__init__(self, administrator)
+        FA2.Admin.__init__(self, sp.address("tz1000000000000000000000000000000000"))
 
     def if_soul_bottle_minted(self, address):
         return self.data.members.contains(address) 
@@ -422,12 +422,21 @@ def mint_soul_bottle_test():
     bob = sp.test_account("Bob")
     factory = TestOrganizationFactory(administrator=alice.address)
     sc += factory
-    organization = Organization(
+    organization = Organization()
+    organization.update_initial_storage(
         factory_address=factory.address,
         administrator=alice.address,
         name=sp.bytes("0x01"),
         description=sp.bytes("0x02"),
-        logo=sp.bytes("0x03")
+        logo=sp.bytes("0x03"),
+        members=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TNat),
+        next_madel_id=sp.nat(1),
+        madels=sp.big_map({}, tkey=sp.TNat, tvalue=t_madel_record),
+        opened_madel_ranks=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
+        ended_madel_ranks=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
+        started_madel_ranks=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
+        my_participated_ranks=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TMap(sp.TNat, sp.TUnit)),
+        my_madels=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TMap(sp.TNat, sp.TNat)),
     )
     sc += organization
     sc.verify(organization.data.last_token_id == sp.nat(0))
@@ -453,12 +462,21 @@ def create_madel_rank_test():
     sc += factory
     sc += factor
     sc += factor2
-    organization = Organization(
+    organization = Organization()
+    organization.update_initial_storage(
         factory_address=factory.address,
         administrator=alice.address,
         name=sp.bytes("0x01"),
         description=sp.bytes("0x02"),
-        logo=sp.bytes("0x03")
+        logo=sp.bytes("0x03"),
+        members=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TNat),
+        next_madel_id=sp.nat(1),
+        madels=sp.big_map({}, tkey=sp.TNat, tvalue=t_madel_record),
+        opened_madel_ranks=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
+        ended_madel_ranks=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
+        started_madel_ranks=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
+        my_participated_ranks=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TMap(sp.TNat, sp.TUnit)),
+        my_madels=sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TMap(sp.TNat, sp.TNat)),
     )
     sc += organization
     sc.verify(organization.data.last_token_id == sp.nat(0))
