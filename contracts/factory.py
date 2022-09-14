@@ -234,8 +234,8 @@ def test_add_factor():
         )
     ).run(source=bob.address)
     sc.verify(factory.data.next_factor_id == sp.nat(2))
-    sp.verify(factory.data.factors.contains(sp.nat(1)))
-    sp.verify(factory.data.factor_addresses.contains(sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm")))
+    sc.verify(factory.data.factors.contains(sp.nat(1)))
+    sc.verify(factory.data.factor_addresses.contains(sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm")))
 
 
 @sp.add_test(name="PauseFactorTest")
@@ -255,8 +255,8 @@ def test_pause_factor():
         )
     ).run(source=bob.address)
     sc.verify(factory.data.next_factor_id == sp.nat(2))
-    sp.verify(factory.data.factors.contains(sp.nat(1)))
-    sp.verify(factory.data.factor_addresses.contains(sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm")))
+    sc.verify(factory.data.factors.contains(sp.nat(1)))
+    sc.verify(factory.data.factor_addresses.contains(sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm")))
 
     factory.pause_factor(
         sp.record(
@@ -264,7 +264,7 @@ def test_pause_factor():
             pause=sp.bool(True)
         )
     ).run(source=bob.address)
-    sp.verify(factory.data.factors[sp.nat(1)])
+    sc.verify(factory.data.factors[sp.nat(1)])
 
 
 @sp.add_test(name="ListFactorTest")
@@ -313,8 +313,8 @@ def test_create_organization():
         )
     ).run(source=bob.address)
     sc.verify(factory.data.next_organization_id == sp.nat(2))
-    sp.verify(factory.data.organizations.contains(sp.nat(1)))
-    sp.verify(factory.data.organization_names.contains(sp.bytes("0x01")))
+    sc.verify(factory.data.organizations.contains(sp.nat(1)))
+    sc.verify(factory.data.organization_names.contains(sp.bytes("0x01")))
 
 
 sp.add_compilation_target("TezCard-Main",
