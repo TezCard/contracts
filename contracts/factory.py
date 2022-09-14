@@ -1,7 +1,6 @@
 import smartpy as sp
 
 # SBT = sp.io.import_script_from_url("file://organization.py")
-FA2 = sp.io.import_script_from_url("https://smartpy.io/templates/fa2_lib.py")
 
 t_organization_params = sp.TRecord(
     name=sp.TBytes,
@@ -75,21 +74,15 @@ class OrganizationFactory(sp.Contract):
                 tvalue=sp.TUnit
             ),
             # record the organizition
-            my_created_organizations=sp.big_map(
-                tkey=sp.TAddress,
-                tvalue=sp.big_map(
-                    tkey=sp.TNat,
-                    tvalue=t_organization_record
-                )
-            ),
+            my_created_organizations=sp.big_map({},
+                                                tkey=sp.TAddress,
+                                                tvalue=sp.TMap(sp.TNat, t_organization_record)
+                                                ),
             #
-            my_joined_organizations=sp.big_map(
-                tkey=sp.TAddress,
-                tvalue=sp.big_map(
-                    tkey=sp.TNat,
-                    tvalue=t_organization_record
-                )
-            ),
+            my_joined_organizations=sp.big_map({},
+                                               tkey=sp.TAddress,
+                                               tvalue=sp.TMap(sp.TNat, t_organization_record)
+                                               ),
             # factors
             next_factor_id=sp.nat(1),
             factors=sp.big_map(
@@ -122,13 +115,14 @@ class OrganizationFactory(sp.Contract):
         organization_id = sp.compute(self.data.next_organization_id)
 
         self.data.organization_names[params.name] = sp.unit
+        timeStamp = sp.now
         record = sp.record(
             id=organization_id,
             address=organization_address,
             name=params.name,
             logo=params.logo,
             decr=params.decr,
-            timestamp=sp.some(sp.now)
+            timestamp=timeStamp
         )
         self.data.organizations[organization_id] = record
         # storage
@@ -221,6 +215,7 @@ class OrganizationFactory(sp.Contract):
 
     def if_has_created_organization(self, address):
         return self.data.my_created_organizations.contains(address)
+
     @sp.offchain_view()
     def list_my_created_organization(self, params):
         """
@@ -228,14 +223,16 @@ class OrganizationFactory(sp.Contract):
         """
         sp.set_type(params, t_list_organizations_params)
         sp.verify(self.if_has_created_organization(sp.sender), "address hasn't created organization")
-        my_created=self.data.my_created_organizations(sp.sender)
+        my_created = self.data.my_created_organizations[sp.sender]
+
         result = sp.compute(sp.list([]))
-        with sp.for_("id", my_created.keys()) as organ:
-            result.push(my_created[id])
+        with sp.for_("item", my_created.items()) as item:
+            result.push(item.value)
         sp.result(result)
 
     def if_has_joined_organization(self, address):
         return self.data.my_joined_organizations.contains(address)
+
     @sp.offchain_view()
     def list_my_join_organization(self, params):
         """
@@ -243,10 +240,10 @@ class OrganizationFactory(sp.Contract):
         """
         sp.set_type(params, t_list_organizations_params)
         sp.verify(self.if_has_joined_organization(sp.sender), "address hasn't created organization")
-        my_joined = self.data.if_has_joined_organization(sp.sender)
+        my_joined = self.data.my_joined_organizations[sp.sender]
         result = sp.compute(sp.list([]))
         with sp.for_("id", my_joined.keys()) as organ:
-            result.push(my_joined[id])
+            result.push(my_joined[organ])
         sp.result(result)
 
     # @sp.entry_point
@@ -417,10 +414,11 @@ def test_my_created_organization():
             offset=sp.nat(1),
             limit=sp.nat(10)
         )
-    ))
+    ).run(source=alice.address))
+
 
 @sp.add_test(name="ListMyJoinedOrganizationTest")
-def test_my_created_organization():
+def test_my_joined_organization():
     sc = sp.test_scenario()
     alice = sp.test_account("Alice2")
     bob = sp.test_account("Bob")
@@ -439,7 +437,8 @@ def test_my_created_organization():
             offset=sp.nat(1),
             limit=sp.nat(10)
         )
-    ))
+    ).run(source=alice.address))
+
 
 sp.add_compilation_target("TezCard-Main",
                           OrganizationFactory(sp.record(admin=sp.address("tz1TZBoXYVy26eaBFbTXvbQXVtZc9SdNgedB"))))
