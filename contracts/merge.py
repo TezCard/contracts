@@ -630,7 +630,7 @@ class OrganizationFactory(sp.Contract):
                 last_token_id=sp.nat(0),
                 ledger=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TAddress),
                 logo=params.logo,
-                madels = sp.big_map({}, tkey=sp.TNat, tvalue=SBT.t_madel_record),
+                madels = sp.big_map({}, tkey=sp.TNat, tvalue=t_madel_record),
                 members = sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TNat),
                 metadata = sp.big_map({}, tkey=sp.TString, tvalue=sp.TBytes),
                 my_madels = sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TMap(sp.TNat, sp.TNat)),

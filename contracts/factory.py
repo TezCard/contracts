@@ -270,8 +270,8 @@ class OrganizationFactory(sp.Contract):
         sp.verify(self.if_has_joined_organization(sp.sender), "address hasn't created organization")
         my_joined = self.data.my_joined_organizations[sp.sender]
         result = sp.compute(sp.list([]))
-        with sp.for_("id", my_joined.keys()) as organ:
-            result.push(my_joined[organ])
+        with sp.for_("item", my_joined.items()) as item:
+            result.push(item.value)
         sp.result(result)
 
     # @sp.entry_point
