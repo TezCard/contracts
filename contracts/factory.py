@@ -75,21 +75,15 @@ class OrganizationFactory(sp.Contract):
                 tvalue=sp.TUnit
             ),
             # record the organizition
-            my_created_organizations=sp.big_map(
-                tkey=sp.TAddress,
-                tvalue=sp.big_map(
-                    tkey=sp.TNat,
-                    tvalue=t_organization_record
-                )
-            ),
+            my_created_organizations=sp.big_map({},
+                                                tkey=sp.TAddress,
+                                                tvalue=sp.TMap(sp.TNat, t_organization_record)
+                                                ),
             #
-            my_joined_organizations=sp.big_map(
-                tkey=sp.TAddress,
-                tvalue=sp.big_map(
-                    tkey=sp.TNat,
-                    tvalue=t_organization_record
-                )
-            ),
+            my_joined_organizations=sp.big_map({},
+                                               tkey=sp.TAddress,
+                                               tvalue=sp.TMap(sp.TNat, t_organization_record)
+                                               ),
             # factors
             next_factor_id=sp.nat(1),
             factors=sp.big_map(
@@ -119,17 +113,44 @@ class OrganizationFactory(sp.Contract):
 
         # contract = SBT.Organization(factory_address=address, administrator=self.data.admin, name=params.name, description=params.decr, logo=params.logo) # FIXME: maybe failed
         #organization_address = sp.create_contract(contract=contract)
-        organization_address = sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm")
+        organization_address = sp.create_contract(
+            storage=sp.record(
+                administrator=sp.source,
+                description=params.decr,
+                ended_madel_ranks = sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
+                factory_address=sp.self_address,
+                last_token_id=sp.nat(0),
+                ledger=sp.big_map({}, tkey=sp.TNat, tvalue=sp.TAddress),
+                logo=params.logo,
+                madels = sp.big_map({}, tkey=sp.TNat, tvalue=SBT.t_madel_record),
+                members = sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TNat),
+                metadata = sp.big_map({}, tkey=sp.TString, tvalue=sp.TBytes),
+                my_madels = sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TMap(sp.TNat, sp.TNat)),
+                my_participated_ranks = sp.big_map({}, tkey=sp.TAddress, tvalue=sp.TMap(sp.TNat, sp.TUnit)),
+                name = params.name,
+                next_madel_id = sp.nat(1),
+                opened_madel_ranks = sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
+                operators = sp.big_map({}, tkey=FA2.t_operator_permission, tvalue=sp.TUnit),
+                started_madel_ranks = sp.big_map({}, tkey=sp.TNat, tvalue=sp.TUnit),
+                token_metadata = sp.big_map({}, tkey=sp.TNat, tvalue=sp.TRecord(
+                    token_id = sp.TNat, 
+                    token_info = sp.TMap(sp.TString, sp.TBytes)
+                ))
+            ),
+            contract=self.initial_organization_contract
+        )
+        #organization_address = sp.address("tz1aTgF2c3vyrk2Mko1yzkJQGAnqUeDapxxm")
         organization_id = sp.compute(self.data.next_organization_id)
 
         self.data.organization_names[params.name] = sp.unit
+        timeStamp = sp.now
         record = sp.record(
             id=organization_id,
             address=organization_address,
             name=params.name,
             logo=params.logo,
             decr=params.decr,
-            timestamp=sp.some(sp.now)
+            timestamp=timeStamp
         )
         self.data.organizations[organization_id] = record
         # storage
@@ -222,6 +243,7 @@ class OrganizationFactory(sp.Contract):
 
     def if_has_created_organization(self, address):
         return self.data.my_created_organizations.contains(address)
+
     @sp.offchain_view()
     def list_my_created_organization(self, params):
         """
@@ -229,14 +251,16 @@ class OrganizationFactory(sp.Contract):
         """
         sp.set_type(params, t_list_organizations_params)
         sp.verify(self.if_has_created_organization(sp.sender), "address hasn't created organization")
-        my_created=self.data.my_created_organizations(sp.sender)
+        my_created = self.data.my_created_organizations[sp.sender]
+
         result = sp.compute(sp.list([]))
-        with sp.for_("id", my_created.keys()) as organ:
-            result.push(my_created[id])
+        with sp.for_("item", my_created.items()) as item:
+            result.push(item.value)
         sp.result(result)
 
     def if_has_joined_organization(self, address):
         return self.data.my_joined_organizations.contains(address)
+
     @sp.offchain_view()
     def list_my_join_organization(self, params):
         """
@@ -244,10 +268,10 @@ class OrganizationFactory(sp.Contract):
         """
         sp.set_type(params, t_list_organizations_params)
         sp.verify(self.if_has_joined_organization(sp.sender), "address hasn't created organization")
-        my_joined = self.data.if_has_joined_organization(sp.sender)
+        my_joined = self.data.my_joined_organizations[sp.sender]
         result = sp.compute(sp.list([]))
         with sp.for_("id", my_joined.keys()) as organ:
-            result.push(my_joined[id])
+            result.push(my_joined[organ])
         sp.result(result)
 
     # @sp.entry_point
@@ -418,10 +442,11 @@ def test_my_created_organization():
             offset=sp.nat(1),
             limit=sp.nat(10)
         )
-    ))
+    ).run(source=alice.address))
+
 
 @sp.add_test(name="ListMyJoinedOrganizationTest")
-def test_my_created_organization():
+def test_my_joined_organization():
     sc = sp.test_scenario()
     alice = sp.test_account("Alice2")
     bob = sp.test_account("Bob")
@@ -440,7 +465,8 @@ def test_my_created_organization():
             offset=sp.nat(1),
             limit=sp.nat(10)
         )
-    ))
+    ).run(source=alice.address))
+
 
 sp.add_compilation_target("TezCard-Main",
                           OrganizationFactory(sp.record(admin=sp.address("tz1TZBoXYVy26eaBFbTXvbQXVtZc9SdNgedB"))))
