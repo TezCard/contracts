@@ -102,7 +102,33 @@ class Organization(FA2.Fa2Nft,
                    FA2.OnchainviewBalanceOf):
 
     def __init__(self):
-        FA2.Fa2Nft.__init__(self, metadata=sp.big_map(l=None, tkey=sp.TString, tvalue=sp.TBytes))
+        # A python dictionary that contains metadata entries
+        metadata_base = {
+            "name": "Organization contract",
+            "version": "1.0.1",
+            "description": "This implements FA2 (TZIP-012) using SmartPy.",
+            "interfaces": ["TZIP-012", "TZIP-016"],
+            "authors": ["SmartPy <https://smartpy.io/#contact>"],
+            "homepage": "https://smartpy.io/ide?template=FA2.py",
+            "source": {
+                "tools": ["SmartPy"],
+                "location": "https://gitlab.com/SmartPy/smartpy/-/raw/master/python/templates/FA2.py",
+            },
+            "permissions": {"receiver": "owner-no-hook", "sender": "owner-no-hook"},
+            "views": [self.madel_rank_details, self.list_my_madels, self.list_my_participated_ranks]
+        }
+        # Helper method that builds the metadata and produces the JSON representation as an artifact.
+        # self.init_metadata("example1", metadata)
+
+        metadata=sp.big_map(l=None, tkey=sp.TString, tvalue=sp.TBytes)
+        # metadata["views"] = [self.madel_rank_details, self.list_my_madels, self.list_my_participated_ranks]
+
+        FA2.Fa2Nft.__init__(self, metadata=metadata, metadata_base=metadata_base)
+
+        # metadata_base["permissions"]["operator"] = self.policy.name
+        self.init_metadata("metadata_base", metadata_base)
+        # FA2.FA2_core.__init__(self, config, metadata, paused=False, administrator=admin)
+
         self.update_initial_storage(
             factory_address=sp.address("KT1000000000000000000000000000000000"),
             name=sp.bytes("0x00"),
@@ -286,20 +312,20 @@ class Organization(FA2.Fa2Nft,
             rank.winners=winners
             self.data.madels[rank_id] = rank
 
-    @sp.offchain_view()
+    @sp.onchain_view()
     def madel_rank_details(self, rank_id):
         sp.set_type(rank_id, sp.TNat)
         sp.verify(self.data.madels.contains(rank_id), "madel rank is not exists")
         sp.result(self.data.madels[rank_id])
 
-    @sp.offchain_view()
+    @sp.onchain_view()
     def list_my_participated_ranks(self):
         result = sp.compute(sp.list(l=[], t=sp.TNat))
         with sp.for_("item", self.data.my_participated_ranks[sp.source].keys()) as item:
             result.push(item)
         sp.result(result)
 
-    @sp.offchain_view()
+    @sp.onchain_view()
     def list_my_madels(self):
         result = sp.compute(sp.list(l=[], t=t_my_madel_details))
         my_madels = self.data.my_madels[sp.source]
@@ -316,15 +342,15 @@ class Organization(FA2.Fa2Nft,
             )
         sp.result(result)
 
-    @sp.offchain_view()
-    def is_madel_rank_open(self, rank_id):
-        sp.set_type(rank_id, sp.TNat)
-        with sp.if_(self.data.madels.contains(rank_id)):
-            sp.result(
-                ~self.data.madels[rank_id].end
-            )
-        with sp.else_():
-            sp.result(sp.bool(False))
+    # @sp.onchain_view()
+    # def is_madel_rank_open(self, rank_id):
+    #     sp.set_type(rank_id, sp.TNat)
+    #     with sp.if_(self.data.madels.contains(rank_id)):
+    #         sp.result(
+    #             ~self.data.madels[rank_id].end
+    #         )
+    #     with sp.else_():
+    #         sp.result(sp.bool(False))
 
     @sp.onchain_view()
     def is_madel_rank_open(self, rank_id):
@@ -336,7 +362,7 @@ class Organization(FA2.Fa2Nft,
         with sp.else_():
             sp.result(sp.bool(False))
 
-    @sp.offchain_view()
+    @sp.onchain_view()
     def organization_details(self):
         sp.result(
             sp.record(
